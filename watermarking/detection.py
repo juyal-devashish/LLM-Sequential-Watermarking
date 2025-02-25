@@ -2,6 +2,48 @@ import torch
 import scipy
 import numpy as np
 
+def seq_mc_permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_seed=100000,alpha=0.05,c=0.04):
+    generator = torch.Generator()
+    generator.manual_seed(int(seed))
+
+    # Note: we flip the statistic sign to align with seq MC permutation paper
+    neg_test_stat = lambda *args, **kwargs: -test_stat(*args, **kwargs)
+
+    W = 1 # the bettor's wealth
+    L = 0 # numer of "successes" so far
+
+    phi_0 = neg_test_stat(tokens=tokens,
+                            n=n,
+                            k=k,
+                            generator=generator,
+                            vocab_size=vocab_size)
+    Ws, phis = [W], [phi_0]
+
+    for t in range(n_runs):
+
+        pi = torch.randperm(vocab_size)
+        tokens = torch.argsort(pi)[tokens]
+        
+        seed = torch.randint(high=max_seed,size=(1,)).item()
+        generator.manual_seed(int(seed))
+        phi_t = neg_test_stat(tokens=tokens,
+                                n=n,
+                                k=k,
+                                generator=generator,
+                                vocab_size=vocab_size,
+                                null=True)
+        
+        if phi_t >= phi_0:
+            L += 1
+        
+        W = (1 - scipy.stats.binom(n = t + 1, p = c).cdf(L)) / c
+        Ws.append(W); phis.append(phi_t)
+
+        if W >= 1/alpha or W < alpha:
+            break
+
+    return 1 / max(Ws), Ws, phis
+
 def permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_seed=100000):
     generator = torch.Generator()
     generator.manual_seed(int(seed))

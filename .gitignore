@@ -1,0 +1,4 @@
+results/
+setup.sh
+.venv/
+**/__pycache__/

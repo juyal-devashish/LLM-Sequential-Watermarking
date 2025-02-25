@@ -16,7 +16,7 @@ import copy
 import numpy as np
 
 from watermarking.generation import generate, generate_rnd
-from watermarking.detection import phi,fast_permutation_test,permutation_test
+from watermarking.detection import phi,fast_permutation_test,permutation_test,seq_mc_permutation_test
 from watermarking.attacks import substitution_attack,insertion_attack,deletion_attack
 
 from watermarking.transform.score import transform_score,transform_edit_score
@@ -69,6 +69,18 @@ parser.add_argument('--language',default="french",type=str)
 
 parser.add_argument('--truncate_vocab',default=8,type=int)
 
+# Added options
+TEST_MAP = {
+    "fast": fast_permutation_test,
+    "permutation": permutation_test,
+    "sequential_mc": seq_mc_permutation_test,
+}
+
+parser.add_argument('--test', choices=TEST_MAP.keys())
+parser.add_argument('--alpha',default=0.05,type=float)
+parser.add_argument('--c',default=0.04,type=float)
+
+
 args = parser.parse_args()
 results['args'] = copy.deepcopy(args)
 
@@ -84,7 +96,7 @@ vocab_size = model.get_output_embeddings().weight.shape[0]
 eff_vocab_size = vocab_size - args.truncate_vocab
 print(f'Loaded the model (t = {time()-t0} seconds)')
 
-dataset = load_dataset("c4", "realnewslike", split="train", streaming=True)
+dataset = load_dataset("c4", "realnewslike", split="train", streaming=True, trust_remote_code=True)
 
 def corrupt(tokens):
     tokens = deletion_attack(tokens,args.deletion)
@@ -225,40 +237,54 @@ else:
 
 ds_iterator = iter(dataset)
 
-null_results = []
-generator = torch.Generator()
-pbar = tqdm(total=args.n_runs)
-run = 0
-while run < args.n_runs:
-    example = next(ds_iterator)
-    text = example['text']
+if args.test == 'fast':
+    null_results = []
+    generator = torch.Generator()
+    pbar = tqdm(total=args.n_runs)
+    run = 0
+    while run < args.n_runs:
+        example = next(ds_iterator)
+        text = example['text']
 
-    tokens = tokenizer.encode(text, return_tensors='pt', truncation=True, max_length=2048-buffer_tokens)[0]
-    if len(tokens) < prompt_tokens + new_tokens:
-        continue
-    tokens = tokens[-new_tokens:]
+        tokens = tokenizer.encode(text, return_tensors='pt', truncation=True, max_length=2048-buffer_tokens)[0]
+        if len(tokens) < prompt_tokens + new_tokens:
+            continue
+        tokens = tokens[-new_tokens:]
 
-    seed = torch.randint(high=args.max_seed,size=(1,)).item()
-    generator.manual_seed(int(seed))
-    null_result = test_stat(tokens=tokens,
-                            n=n,
-                            k=k,
-                            generator=generator,
-                            vocab_size=vocab_size,
-                            null=True)
+        seed = torch.randint(high=args.max_seed,size=(1,)).item()
+        generator.manual_seed(int(seed))
+        null_result = test_stat(tokens=tokens,
+                                n=n,
+                                k=k,
+                                generator=generator,
+                                vocab_size=vocab_size,
+                                null=True)
 
-    null_results.append(null_result)
-    run += 1
-    pbar.update(1)
+        null_results.append(null_result)
+        run += 1
+        pbar.update(1)
 
-null_results = torch.sort(torch.tensor(null_results)).values
-test = lambda tokens,seed : fast_permutation_test(tokens,
-                                                  vocab_size,
-                                                  n,
-                                                  k,
-                                                  seed,
-                                                  test_stat,
-                                                  null_results)
+    null_results = torch.sort(torch.tensor(null_results)).values
+
+if args.test == 'fast':
+    test = lambda tokens,seed : fast_permutation_test(tokens,
+                                                    vocab_size,
+                                                    n,
+                                                    k,
+                                                    seed,
+                                                    test_stat,
+                                                    null_results)
+elif args.test == 'sequential_mc':
+    test = lambda tokens,seed : seq_mc_permutation_test(tokens,
+                                                vocab_size,
+                                                n,
+                                                k,
+                                                seed,
+                                                test_stat,
+                                                args.n_runs,
+                                                alpha=args.alpha,
+                                                c=args.c)
+
 
 
 t1 = time()
@@ -339,7 +365,7 @@ for itm in range(T):
 pbar.close()
 print(f'Ran the experiment (t = {time()-t1} seconds)')
 
-results['watermark']['pvals'] = torch.tensor(pvals_watermark)
-results['null']['pvals'] = torch.tensor(pvals_null)
+results['watermark']['pvals'] = pvals_watermark
+results['null']['pvals'] = pvals_null
 
 pickle.dump(results,open(args.save,"wb"))
