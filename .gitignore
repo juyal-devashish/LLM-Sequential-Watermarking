@@ -1,4 +1,5 @@
-results/
+results/*.ipynb
+*.pkl
 setup.sh
 .venv/
 **/__pycache__/
