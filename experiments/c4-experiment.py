@@ -29,7 +29,7 @@ from watermarking.gumbel.key import gumbel_key_func
 
 from watermarking.kirchenbauer.watermark_processor import WatermarkLogitsProcessor, WatermarkDetector
 
-import argparse
+import argparse, os
 
 results = defaultdict(dict)
 
@@ -38,7 +38,7 @@ parser = argparse.ArgumentParser(description="Experiment Settings")
 parser.add_argument('--method',default="transform",type=str)
 
 parser.add_argument('--model',default="facebook/opt-1.3b",type=str)
-parser.add_argument('--save',default="",type=str)
+parser.add_argument('--save',default="results/tmp.p",type=str)
 parser.add_argument('--seed',default=0,type=int)
 parser.add_argument('--batch_size',default=1,type=int)
 
@@ -76,7 +76,7 @@ TEST_MAP = {
     "sequential_mc": seq_mc_permutation_test,
 }
 
-parser.add_argument('--test', choices=TEST_MAP.keys())
+parser.add_argument('--test', choices=TEST_MAP.keys(), default='fast')
 parser.add_argument('--alpha',default=0.05,type=float)
 parser.add_argument('--c',default=0.04,type=float)
 
@@ -285,7 +285,14 @@ elif args.test == 'sequential_mc':
                                                 alpha=args.alpha,
                                                 c=args.c)
 
-
+elif args.test == 'permutation':
+    test = lambda tokens,seed: permutation_test(tokens,
+                                                vocab_size,
+                                                n,
+                                                k,
+                                                seed,
+                                                test_stat,
+                                                n_runs=args.n_runs)
 
 t1 = time()
 
@@ -308,7 +315,7 @@ results['prompts'] = copy.deepcopy(prompts)
 
 null_samples = []
 watermarked_samples = []
-for batch in range(n_batches):
+for batch in tqdm(range(n_batches)):
     idx = torch.arange(batch * args.batch_size,min(T,(batch + 1) * args.batch_size))
 
     null_samples.append(generate_rnd(prompts[idx],new_tokens+buffer_tokens,model)[:,prompt_tokens:])
@@ -363,7 +370,9 @@ for itm in range(T):
     pbar.update(1)
 
 pbar.close()
-print(f'Ran the experiment (t = {time()-t1} seconds)')
+
+results['time'] = time()-t1
+print(f'Ran the experiment (t = {results['time']} seconds)')
 
 results['watermark']['pvals'] = pvals_watermark
 results['null']['pvals'] = pvals_null
