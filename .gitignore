@@ -1,4 +1,6 @@
-results/
+# results/
+results/*
+!results/*.png
 *.pkl
 setup.sh
 .venv/
