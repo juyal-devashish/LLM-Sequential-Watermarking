@@ -8,27 +8,27 @@ We just replace the full permutation test in the `detect` algorithm to the seque
 
 To run the experiments, follow these steps:
 
-1. **Create the environment:**
+1. **Create and activate the environment, and run the experiment scripts:**
 
+   ```bash
+   # Create the environment
    conda create --name <env> --file requirement.txt
 
-2. **Activate your new environment:**
+2. **Activate your new environment**
    conda activate <env>
+3. **Run the experiment scripts**
 
-3. **Run the experiment scripts:**
-  # Power curve experiments (corresponds to Section 5.1: Oracle Power Curve Experiment)
+   # Power curve experiments
    ./experiments/scripts/experiment-power-curve.sh <save directory path> facebook/opt-1.3b
 
-  # Deletion perturbation experiments
+   # Deletion perturbation experiments
    ./experiments/scripts/experiment-del.sh <save directory path> facebook/opt-1.3b
 
-  # Insertion perturbation experiments
+   # Insertion perturbation experiments
    ./experiments/scripts/experiment-ins.sh <save directory path> facebook/opt-1.3b
 
-  # Substitution perturbation experiments
+   # Substitution perturbation experiments
    ./experiments/scripts/experiment-sub.sh <save directory path> facebook/opt-1.3b
-
-For algorithm details, please refer to the final report.
 
 Here are results that we got, using $\alpha = 0.05$ and (Algorithm 3) $c=0.04$:
 <p align="center">
