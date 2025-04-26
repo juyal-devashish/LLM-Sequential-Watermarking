@@ -18,7 +18,7 @@ def seq_mc_permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_
                             generator=generator,
                             vocab_size=vocab_size)
     Ws, phis = [W], [phi_0]
-
+    tim = 0
     for t in range(n_runs):
 
         pi = torch.randperm(vocab_size)
@@ -40,9 +40,12 @@ def seq_mc_permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_
         Ws.append(W); phis.append(phi_t)
 
         if W >= 1/alpha or W < alpha:
+            tim = t + 1
             break
+    if tim == 0:
+        tim = n_runs
 
-    return 1 / max(Ws), Ws, phis
+    return 1 / max(Ws), Ws, phis, tim
 
 def permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_seed=100000):
     generator = torch.Generator()

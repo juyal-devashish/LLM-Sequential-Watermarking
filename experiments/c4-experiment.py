@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from time import time
 
 import torch
@@ -45,7 +48,7 @@ parser.add_argument('--batch_size',default=1,type=int)
 parser.add_argument('--m',default=80,type=int)
 parser.add_argument('--k',default=0,type=int)
 parser.add_argument('--n',default=256,type=int)
-parser.add_argument('--T',default=500,type=int)
+parser.add_argument('--T',default=200,type=int)
 
 parser.add_argument('--prompt_tokens',default=50,type=int)
 parser.add_argument('--buffer_tokens',default=20,type=int)
@@ -76,7 +79,7 @@ TEST_MAP = {
     "sequential_mc": seq_mc_permutation_test,
 }
 
-parser.add_argument('--test', choices=TEST_MAP.keys(), default='fast')
+parser.add_argument('--test', choices=TEST_MAP.keys(), default='sequential_mc')
 parser.add_argument('--alpha',default=0.05,type=float)
 parser.add_argument('--c',default=0.04,type=float)
 
@@ -332,7 +335,9 @@ watermarked_samples = torch.clip(watermarked_samples,max=eff_vocab_size-1)
 print(f'Generated samples in (t = {time()-t1} seconds)')
 
 pvals_watermark = []
+permumation_time_watermark = []
 pvals_null = []
+permumation_time_null = []
 pbar = tqdm(total=T)
 for itm in range(T):
     null_sample = null_samples[itm]
@@ -348,8 +353,10 @@ for itm in range(T):
         null_sample = torch.nn.functional.pad(null_sample,(new_tokens-len(null_sample),0),"constant",0)
     else:
         null_sample = null_sample[1:new_tokens+1]
-    pval = test(null_sample, seeds[itm])
+    pval, _, _, tim = test(null_sample, seeds[itm])
+
     pvals_null.append(pval)
+    permumation_time_null.append(tim)
 
     watermarked_sample = watermarked_samples[itm]
     watermarked_sample = corrupt(watermarked_sample)
@@ -364,17 +371,23 @@ for itm in range(T):
         watermarked_sample = torch.nn.functional.pad(watermarked_sample,(new_tokens-len(watermarked_sample),0),"constant",0)
     else:
         watermarked_sample = watermarked_sample[1:new_tokens+1]
-    pval = test(watermarked_sample, seeds[itm])
+    # pval = test(watermarked_sample, seeds[itm])
+    pval, _, _, tim = test(watermarked_sample, seeds[itm])
+
     pvals_watermark.append(pval)
+    permumation_time_watermark.append(tim)
 
     pbar.update(1)
 
 pbar.close()
 
 results['time'] = time()-t1
-print(f'Ran the experiment (t = {results['time']} seconds)')
+print(f"Ran the experiment (t = {results['time']} seconds)")
+
 
 results['watermark']['pvals'] = pvals_watermark
 results['null']['pvals'] = pvals_null
+results['watermark']['tim'] = permumation_time_watermark
+results['null']['tim'] = permumation_time_null
 
 pickle.dump(results,open(args.save,"wb"))
