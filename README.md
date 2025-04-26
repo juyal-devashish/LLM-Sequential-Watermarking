@@ -15,9 +15,11 @@ To run the experiments, follow these steps:
    conda create --name <env> --file requirement.txt
 
 2. **Activate your new environment**
+   ```bash
+   # Activate the environment
    conda activate <env>
 3. **Run the experiment scripts**
-
+   ```bash
    # Power curve experiments
    ./experiments/scripts/experiment-power-curve.sh <save directory path> facebook/opt-1.3b
 
