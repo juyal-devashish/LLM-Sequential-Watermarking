@@ -1,6 +1,9 @@
 # results/
-results/*
-!results/*.png
+results/**
+!results/**/*.png
+results/**/*n_permutations.png
+results/**/*ps.png
+
 *.pkl
 setup.sh
 .venv/
