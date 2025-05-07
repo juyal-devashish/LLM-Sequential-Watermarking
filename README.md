@@ -1,3 +1,9 @@
+## 📌 About This Fork
+
+This repository is a fork of a collaborative project originally developed [here](https://github.com/emiliocantuc/watermark-sequential) by our project group.
+
+This fork reflects both my contributions to the original project and any personal enhancements I continue to make.
+
 # (Sequential) Robust Distortion-free Watermarks for Language Models
 
 Slight modification of the methods described in [Robust Distortion-free Watermarks for Language Models](https://arxiv.org/abs/2307.15593). Original repo [here](https://github.com/jthickstun/watermark).
