@@ -1,4 +1,6 @@
-# About This Fork (contains Final Reports/Slides with results)
+# About This Fork (contains Reports/Slides with results)
+
+The project contents (like reports, slides and results) can be found [here](https://github.com/juyal-devashish/LLM-Sequential-Watermarking/tree/main/reports)!
 
 This repository is a fork of a collaborative research project originally developed by our project group during the Winter 2025 semester at the University of Michigan, Ann Arbor, as part of CSE-598: Large Language Models. You can find the original repository [here](https://github.com/emiliocantuc/watermark-sequential), this repo in addition to the code also consists of the reports and slides related to this project.
 
