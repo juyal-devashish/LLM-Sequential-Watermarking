@@ -1,78 +1,18 @@
 # 📌 About This Fork
 
-This repository is a fork of a collaborative research project originally developed by our project group during the **Winter 2025** semester at the University of Michigan, Ann Arbor, as part of **CSE-598: Large Language Models**. You can find the original repository [here](https://github.com/original-org/original-repo).
+This repository is a fork of a collaborative research project originally developed by our project group during the Winter 2025 semester at the University of Michigan, Ann Arbor, as part of CSE-598: Large Language Models. You can find the original repository [here](https://github.com/emiliocantuc/watermark-sequential), this repo in addition to the code also consists of the reports and slides related to this project.
 
-This fork specifically highlights **my core contributions** to the initial group project and includes ongoing personal improvements, extensions, and further experimentation.
+This fork specifically highlights contributions to the initial group project and includes ongoing personal improvements, extensions, and further experimentation.
 
----
+## Project: Sequential Detection of Watermarks for Language Models
 
-## 🔍 Project: Sequential Robust Distortion-free Watermarks for Language Models
+This project explores and extends methodologies described in the paper “Robust Distortion-free Watermarks for Language Models” (Kuditipudi et al.). The paper can be found [here](https://arxiv.org/abs/2307.15593) and it's original repository can be found [here](https://github.com/jthickstun/watermark).
 
-This project explores and extends methodologies described in the paper **“Robust Distortion-free Watermarks for Language Models”** (Kuditipudi et al.). The original implementation from that paper can be found [here](https://github.com/kuditipudi/watermark-method).
+### Objective of the Project
 
-### 🎯 Motivation & Objectives
+The goal was to replace the traditional Full Permutation test which is reliable but computationally expensive and takes longer to decide on a hypothesis with a Sequential Monte Carlo (SMC) test structured within a test-by-betting framework (inspired by Fischer & Ramadas, the paper can be found [here](https://arxiv.org/abs/2401.07365)) without losing any of the inherent properties of the watermark.
+For the duration of the project we designed a sequential testing procedure using betting-based stopping rules, embedded the SMC test into the original watermark detection pipeline, compared detection latency, Type I/II error rates, and overall throughput against the Full Permutation baseline.
 
-- **Goal**: Embed robust, invisible, and efficiently-detectable watermarks into generated text outputs of large language models (LLMs) without compromising naturalness or readability.
-- **Challenge**: Traditional Full Permutation testing is reliable but computationally expensive.
-- **Our Proposal**: Replace the Full Permutation test with a **Sequential Monte Carlo (SMC)** test structured within a **test-by-betting** framework (inspired by Fischer & Ramadas, 2024).
-- **Benefits**:
-  - **Faster runtime** (reduced computational complexity)
-  - **Maintained or improved statistical power**
-  - **Strict control of Type I error** (false positives)
-  - **Scalability** for real-time, large-scale deployments
-
----
-
-## 🚀 Key Contributions & Modifications
-
-1. **SMC-based Detection**  
-   - Designed a sequential testing procedure using particle filters and betting-based stopping rules.
-2. **Algorithm Integration**  
-   - Embedded the SMC test into the original watermark detection pipeline.
-3. **Benchmarking & Evaluation**  
-   - Compared detection latency, Type I/II error rates, and overall throughput against the Full Permutation baseline.
-4. **Code Refactoring & Documentation**  
-   - Modularized scripts for ease of extension and reproducibility.
-
----
-
-## 🧪 Running the Experiments
-
-### Prerequisites
-
-- Python 3.8+
-- CUDA‑enabled GPU (optional for large-scale model trials)
-
-### Quick Start
-
-```bash
-# 1. Clone this fork
-git clone https://github.com/yourusername/watermark-sequential.git
-cd watermark-sequential
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Run a sample experiment
-python experiments/run_watermarking.py \
-  --config configs/your_experiment_config.yaml
-
-
-
-
-
-
-## 📌 About This Fork
-
-This repository is a fork of a collaborative project originally developed [here](https://github.com/emiliocantuc/watermark-sequential) by our project group over Winter 2025 at Univeristy of Michigan, Ann Arbor for CSE-598: Large Language Models.
-
-This fork reflects both my contributions to the original project and any personal enhancements I continue to make.
-
-# (Sequential) Robust Distortion-free Watermarks for Language Models
-
-Modification of the methods described in [Robust Distortion-free Watermarks for Language Models](https://arxiv.org/abs/2307.15593). Original repo is [here](https://github.com/jthickstun/watermark).
-
-We replace the traditional Full Permutation test in the `detect` algorithm used by Kuditipudi et. al. with a sequential Monte Carlo (in a test-by-betting framework) test inspired by the work of [Fischer and Ramadas](https://arxiv.org/abs/2401.07365) (particularly the mixture strategy). The aim is to make a level alpha the test faster without sacrificing power or Type I error. 
 # Running the Experiments
 
 To run the experiments, follow these steps:
