@@ -1,4 +1,4 @@
-# 📌 About This Fork
+# About This Fork (contains Final Reports/Slides with results)
 
 This repository is a fork of a collaborative research project originally developed by our project group during the Winter 2025 semester at the University of Michigan, Ann Arbor, as part of CSE-598: Large Language Models. You can find the original repository [here](https://github.com/emiliocantuc/watermark-sequential), this repo in addition to the code also consists of the reports and slides related to this project.
 
