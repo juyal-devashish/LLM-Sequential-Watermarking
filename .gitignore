@@ -1,10 +1,28 @@
-# results/
-results/**
-!results/**/*.png
-results/**/*n_permutations.png
-results/**/*ps.png
-
-*.pkl
-setup.sh
+# Python environments and build products
 .venv/
-**/__pycache__/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+.pyxbld/
+.build-check/
+.DS_Store
+
+# Generated experiment data; curated figures and exhibit exports are versioned
+*.p
+*.pkl
+results/*
+!results/README.md
+!results/figures/
+!results/exhibit/
+
+# Future frontend tooling
+node_modules/
+frontend/dist/
+frontend/.vite/
+.env
+.env.*
+!.env.example

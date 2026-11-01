@@ -1,3 +1,4 @@
+from pathlib import Path
 import json
 
 import torch
@@ -209,7 +210,7 @@ test = lambda tokens,seed : permutation_test(tokens,
                                              test_stat,
                                              n_runs=args.n_runs)
 
-with open("experiments/instructions/alpaca_farm_evaluation.json") as f:
+with (Path(__file__).parent / "instructions" / "alpaca_farm_evaluation.json").open() as f:
     dataset = json.load(f)
 
 # This is the prompt that the Alpaca team uses

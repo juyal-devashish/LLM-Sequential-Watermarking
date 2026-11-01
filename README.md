@@ -1,94 +1,76 @@
-# About This Fork (contains Reports/Slides with results)
+# Sequential Watermarking of Language Models
 
-The project contents (like reports, slides and results) can be found [here](https://github.com/juyal-devashish/LLM-Sequential-Watermarking/tree/main/reports)!
+Research on replacing a fixed-budget watermark permutation test with a sequential Monte Carlo test that can stop once enough evidence has accumulated. The project combines distortion-free watermark generation with testing by betting and evaluates detection power, false positives, and resampling cost under token edits.
 
-This repository is a fork of a collaborative research project originally developed by our project group during the Winter 2025 semester at the University of Michigan, Ann Arbor, as part of CSE-598: Large Language Models. You can find the original repository [here](https://github.com/emiliocantuc/watermark-sequential), this repo in addition to the code also consists of the reports and slides related to this project.
+This is a University of Michigan CSE 598 Winter 2025 group project, forked from [the original group repository](https://github.com/emiliocantuc/watermark-sequential). The underlying watermark implementations build on [Kuditipudi et al.](https://github.com/jthickstun/watermark). Project-level work is collaborative; individual contributions are recorded in the final report.
 
-This fork specifically highlights contributions to the initial group project and includes ongoing personal improvements, extensions, and further experimentation.
+The repository is being prepared for an interactive project exhibit. The layout is organized for development; the research implementation still has known validation gaps. See the [exhibit plan](docs/EXHIBIT_PLAN.md) and [validation backlog](docs/VALIDATION.md).
 
-## Project: Sequential Detection of Watermarks for Language Models
+## Repository map
 
-This project explores and extends methodologies described in the paper “Robust Distortion-free Watermarks for Language Models” (Kuditipudi et al.). The paper can be found [here](https://arxiv.org/abs/2307.15593) and it's original repository can be found [here](https://github.com/jthickstun/watermark).
+| Location | Contents |
+| --- | --- |
+| `src/watermarking/` | Importable generation, detection, attacks, and watermark methods |
+| `experiments/` | C4 and instruction experiment runners, sweeps, and instruction inputs |
+| `examples/legacy_demo/` | Original standalone Python/JavaScript demonstrations |
+| `notebooks/` | Exploratory analysis with historical embedded outputs |
+| `results/figures/` | Original saved project plots |
+| `reports/` | Original midterm report, final report, and slides |
+| `environments/` | Historical Linux/CUDA Conda package export |
+| `docs/` | Architecture, evidence inventory, validation work, and exhibit plan |
+| `frontend/` | Exhibit implementation brief; the website is not implemented yet |
 
-### Objective of the Project
+See [the migration map](docs/REPOSITORY_LAYOUT.md) for renamed paths.
 
-The goal was to replace the traditional Full Permutation test which is reliable but computationally expensive and takes longer to decide on a hypothesis with a Sequential Monte Carlo (SMC) test structured within a test-by-betting framework (inspired by Fischer & Ramadas, the paper can be found [here](https://arxiv.org/abs/2401.07365)) without losing any of the inherent properties of the watermark.
-For the duration of the project we designed a sequential testing procedure using betting-based stopping rules, embedded the SMC test into the original watermark detection pipeline, compared detection latency, Type I/II error rates, and overall throughput against the Full Permutation baseline.
+## Local setup
 
-# Running the Experiments
+Use Python 3.11 and a C compiler for the Cython alignment modules. The new dependency manifest is a starting point for portable setup, not a verified reproduction lockfile.
 
-To run the experiments, follow these steps:
-
-1. **Create and activate the environment, and run the experiment scripts:**
-
-   ```bash
-   # Create the environment
-   conda create --name <env> --file requirement.txt
-
-2. **Activate your new environment**
-   ```bash
-   # Activate the environment
-   conda activate <env>
-3. **Run the experiment scripts**
-   ```bash
-   # Power curve experiments
-   ./experiments/scripts/experiment-power-curve.sh <save directory path> facebook/opt-1.3b
-
-   # Deletion perturbation experiments
-   ./experiments/scripts/experiment-del.sh <save directory path> facebook/opt-1.3b
-
-   # Insertion perturbation experiments
-   ./experiments/scripts/experiment-ins.sh <save directory path> facebook/opt-1.3b
-
-   # Substitution perturbation experiments
-   ./experiments/scripts/experiment-sub.sh <save directory path> facebook/opt-1.3b
-
-Here are results that we got, using $\alpha = 0.05$ and (Algorithm 3) $c=0.04$:
-<p align="center">
-  <img src="results/power and null rejection.png" width="45%"/>
-  <img src="results/decision permutations.png" width="45%"/>
-</p>
-
-<p align="center">
-  <img src="results/avg_pval_by_method.png" width="45%"/>
-  <img src="results/avg_power_by_method.png" width="45%"/>
-</p>
-
-<p align="center">
-  <img src="results/avg_nullrate_by_method.png" width="45%"/>
-  <img src="results/avg_perms_by_method.png" width="45%"/>
-</p>
-
-<p align="center">
-  <img src="results/combined_pval_vs_rate.png" width="45%"/>
-  <img src="results/combined_power_vs_rate.png" width="45%"/>
-</p>
-
-<p align="center">
-  <img src="results/combined_nullrate_vs_rate.png" width="45%"/>
-  <img src="results/combined_perms_vs_rate.png" width="45%"/>
-</p>
-
-
-
-## References
-```bib
-@article{kuditipudi2023robust,
-  title={Robust Distortion-free Watermarks for Language Models},
-  author={Kuditipudi, Rohith and Thickstun, John and Hashimoto, Tatsunori and Liang, Percy},
-  journal={arXiv preprint arXiv:2307.15593},
-  year={2023}
-}
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[experiments,analysis]'
 ```
 
-```bib
-@misc{fischer2024sequentialmontecarlotestingbetting,
-      title={Sequential Monte-Carlo testing by betting}, 
-      author={Lasse Fischer and Aaditya Ramdas},
-      year={2024},
-      eprint={2401.07365},
-      archivePrefix={arXiv},
-      primaryClass={stat.ME},
-      url={https://arxiv.org/abs/2401.07365}, 
-}
+`requirements.txt` delegates to this editable install. The former Conda export is preserved verbatim at `environments/conda-linux-64.txt`; it is Linux/CUDA specific and should not be used directly on macOS. PyTorch device selection currently uses CUDA when available and CPU otherwise; Apple MPS support has not been added.
+
+## Research entry points
+
+Run these from the repository root after installation:
+
+```bash
+python -m experiments.c4_experiment --help
+python -m experiments.instruct_experiment --help
+python -m experiments.analyze --help
 ```
+
+A small C4 sequential experiment, after the validation issues have been addressed:
+
+```bash
+mkdir -p results/raw/smoke
+python -m experiments.c4_experiment \
+  --save results/raw/smoke/sequential.p \
+  --model facebook/opt-1.3b --test sequential_mc \
+  --T 2 --batch_size 1 --m 20 --n_runs 100
+```
+
+Experiments download models/datasets and may take substantial time on CPU. The instruction runner retains a historical local model default and needs an explicit accessible `--model`. Full research sweeps are in `experiments/scripts/`; they have portable paths, but their scientific behavior is pending the checks in [VALIDATION.md](docs/VALIDATION.md). In particular, the power sweep's fixed/fast branches currently hit a result-shape bug.
+
+The notebooks resolve the repository root automatically when opened from the repository or `notebooks/`. They require raw `results/exp-del`, `results/exp-sub`, and `results/exp-ins` data, which are not included. Their old outputs are preserved and have not been recomputed.
+
+## Reports and evidence
+
+- [Final report](reports/Final%20Report.pdf)
+- [Midterm report](reports/Midterm%20Report.pdf)
+- [Project slides](reports/Project%20Slides.pdf)
+- [Additional write-up supplied by the author](https://drive.google.com/file/d/1KNR2OcLC9Ueuu13OQ-wDDC5eKqOUWkYq/view)
+- [Evidence inventory](docs/EVIDENCE.md)
+
+Saved figures are historical results. The current checkout has no raw per-trial experiment files or saved detection traces. No new performance claim follows from the directory cleanup.
+
+## Research references
+
+- Kuditipudi et al., [Robust Distortion-free Watermarks for Language Models](https://arxiv.org/abs/2307.15593).
+- Fischer and Ramdas, [Sequential Monte-Carlo Testing by Betting](https://arxiv.org/abs/2401.07365).
+
+Upstream attribution and notices embedded in the source are retained. This reorganization does not assign a new license to inherited code.
