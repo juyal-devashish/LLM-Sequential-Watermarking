@@ -1,391 +1,434 @@
-from time import time
-
-import torch
-import torch.nn.functional as F
-
-from transformers import AutoTokenizer, AutoModelForCausalLM, LogitsProcessorList
-from transformers import MarianMTModel, MarianTokenizer
-
-from datasets import load_dataset
-
-from tqdm import tqdm
-from collections import defaultdict
-import pickle
-import copy
-
-import numpy as np
-
-from experiments.result_adapter import result_for_experiment
-from watermarking.generation import generate, generate_rnd
-from watermarking.detection import phi,fast_permutation_test,permutation_test,seq_mc_permutation_test
-from watermarking.attacks import substitution_attack,insertion_attack,deletion_attack
-
-from watermarking.transform.score import transform_score,transform_edit_score
-from watermarking.transform.sampler import transform_sampling
-from watermarking.transform.key import transform_key_func
-
-from watermarking.gumbel.score import gumbel_score,gumbel_edit_score
-from watermarking.gumbel.sampler import gumbel_sampling
-from watermarking.gumbel.key import gumbel_key_func
-
-from watermarking.kirchenbauer.watermark_processor import WatermarkLogitsProcessor, WatermarkDetector
-
-import argparse, os
-
-results = defaultdict(dict)
-
-parser = argparse.ArgumentParser(description="Experiment Settings")
-
-parser.add_argument('--method',default="transform",type=str)
-
-parser.add_argument('--model',default="facebook/opt-1.3b",type=str)
-parser.add_argument('--save',default="results/tmp.p",type=str)
-parser.add_argument('--seed',default=0,type=int)
-parser.add_argument('--batch_size',default=1,type=int)
-
-parser.add_argument('--m',default=80,type=int)
-parser.add_argument('--k',default=0,type=int)
-parser.add_argument('--n',default=256,type=int)
-parser.add_argument('--T',default=200,type=int)
-
-parser.add_argument('--prompt_tokens',default=50,type=int)
-parser.add_argument('--buffer_tokens',default=20,type=int)
-parser.add_argument('--n_runs',default=5000,type=int)
-parser.add_argument('--max_seed',default=100000,type=int)
-parser.add_argument('--offset', action='store_true')
-
-parser.add_argument('--norm',default=1,type=int)
-parser.add_argument('--gamma',default=0.0,type=float)
-parser.add_argument('--edit', action='store_true')
-
-parser.add_argument('--deletion',default=0.0,type=float)
-parser.add_argument('--insertion',default=0.0,type=float)
-parser.add_argument('--substitution',default=0.0,type=float)
-
-parser.add_argument('--kirch_gamma',default=0.25,type=float)
-parser.add_argument('--kirch_delta',default=1.0,type=float)
-
-parser.add_argument('--rt_translate', action='store_true')
-parser.add_argument('--language',default="french",type=str)
-
-parser.add_argument('--truncate_vocab',default=8,type=int)
-
-# Added options
-TEST_MAP = {
-    "fast": fast_permutation_test,
-    "permutation": permutation_test,
-    "sequential_mc": seq_mc_permutation_test,
-}
-
-parser.add_argument('--test', choices=TEST_MAP.keys(), default='sequential_mc')
-parser.add_argument('--alpha',default=0.05,type=float)
-parser.add_argument('--c',default=0.04,type=float)
+import argparse
 
 
-args = parser.parse_args()
-results['args'] = copy.deepcopy(args)
+def main():
+    parser = argparse.ArgumentParser(description="Experiment Settings")
 
-# fix the random seed for reproducibility
-t0 = time()
-torch.manual_seed(args.seed)
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    parser.add_argument('--method',default="transform",type=str)
 
-tokenizer = AutoTokenizer.from_pretrained(args.model)
-model = AutoModelForCausalLM.from_pretrained(args.model).to(device)
+    parser.add_argument('--model',default="facebook/opt-1.3b",type=str)
+    parser.add_argument('--save',default="results/tmp.p",type=str)
+    parser.add_argument('--seed',default=0,type=int)
+    parser.add_argument('--batch_size',default=1,type=int)
 
-vocab_size = model.get_output_embeddings().weight.shape[0]
-eff_vocab_size = vocab_size - args.truncate_vocab
-print(f'Loaded the model (t = {time()-t0} seconds)')
+    parser.add_argument('--m',default=80,type=int)
+    parser.add_argument('--k',default=0,type=int)
+    parser.add_argument('--n',default=256,type=int)
+    parser.add_argument('--T',default=200,type=int)
 
-dataset = load_dataset("c4", "realnewslike", split="train", streaming=True, trust_remote_code=True)
+    parser.add_argument('--prompt_tokens',default=50,type=int)
+    parser.add_argument('--buffer_tokens',default=20,type=int)
+    parser.add_argument('--n_runs',default=5000,type=int)
+    parser.add_argument('--max_seed',default=100000,type=int)
+    parser.add_argument('--offset', action='store_true')
 
-def corrupt(tokens):
-    tokens = deletion_attack(tokens,args.deletion)
-    tokens = insertion_attack(tokens,args.insertion,eff_vocab_size)
-    tokens = substitution_attack(tokens,args.substitution,eff_vocab_size)
+    parser.add_argument('--norm',default=1,type=int)
+    parser.add_argument('--gamma',default=0.0,type=float)
+    parser.add_argument('--edit', action='store_true')
 
-    return tokens
+    parser.add_argument('--deletion',default=0.0,type=float)
+    parser.add_argument('--insertion',default=0.0,type=float)
+    parser.add_argument('--substitution',default=0.0,type=float)
 
-T = args.T                  # number of prompts/generations
-n_batches = int(np.ceil(T / args.batch_size)) # number of batches
-prompt_tokens = args.prompt_tokens      # minimum prompt length
-new_tokens = args.m     # number of tokens to generate
-buffer_tokens = args.buffer_tokens
-if args.k == 0: 
-    k = args.m # k is the block size (= number of tokens)
-else:
-    k = args.k     
-n = args.n     # watermark key length
+    parser.add_argument('--kirch_gamma',default=0.25,type=float)
+    parser.add_argument('--kirch_delta',default=1.0,type=float)
 
-if args.rt_translate:
-    if args.language == "french":
-        en_ne_model_name = "Helsinki-NLP/opus-mt-tc-big-en-fr"
-        en_ne_tokenizer = MarianTokenizer.from_pretrained(en_ne_model_name)
-        en_ne_model = MarianMTModel.from_pretrained(en_ne_model_name).to(device)
+    parser.add_argument('--rt_translate', action='store_true')
+    parser.add_argument('--language',default="french",type=str)
 
-        ne_en_model_name = "Helsinki-NLP/opus-mt-tc-big-fr-en"
-        ne_en_tokenizer = MarianTokenizer.from_pretrained(ne_en_model_name)
-        ne_en_model = MarianMTModel.from_pretrained(ne_en_model_name).to(device)
-    elif args.language == "russian":
-        en_ne_model_name = "Helsinki-NLP/opus-mt-en-ru"
-        en_ne_tokenizer = MarianTokenizer.from_pretrained(en_ne_model_name)
-        en_ne_model = MarianMTModel.from_pretrained(en_ne_model_name).to(device)
+    parser.add_argument('--truncate_vocab',default=8,type=int)
 
-        ne_en_model_name = "Helsinki-NLP/opus-mt-ru-en"
-        ne_en_tokenizer = MarianTokenizer.from_pretrained(ne_en_model_name)
-        ne_en_model = MarianMTModel.from_pretrained(ne_en_model_name).to(device)
+    # Added options
+    TEST_MAP = dict.fromkeys(["fast", "permutation", "sequential_mc"])
+
+    parser.add_argument('--test', choices=TEST_MAP.keys(), default='sequential_mc')
+    parser.add_argument('--alpha',default=0.05,type=float)
+    parser.add_argument('--c',default=0.04,type=float)
+
+
+    args = parser.parse_args()
+    if args.m < 1 or args.n < 1 or args.n_runs < 1:
+        parser.error("m, n, and n_runs must be positive")
+    if args.T < 1 or args.batch_size < 1 or not 0 < args.c < args.alpha < 1:
+        parser.error("Require positive T/batch_size and 0 < c < alpha < 1")
+    if args.method == "kirchenbauer":
+        parser.error("Kirchenbauer requires its dedicated z-score detector; key-randomization tests apply to transform/gumbel")
+    if any(not 0 <= rate <= 1 for rate in (args.deletion,args.insertion,args.substitution)):
+        parser.error("Attack rates must be in [0, 1]")
+
+
+    from time import time
+
+    import torch
+    import torch.nn.functional as F
+
+    from transformers import AutoTokenizer, AutoModelForCausalLM, LogitsProcessorList
+    from transformers import MarianMTModel, MarianTokenizer
+
+    from datasets import load_dataset
+
+    from tqdm import tqdm
+    from collections import defaultdict
+    import pickle
+    import copy
+
+    import numpy as np
+
+    from experiments.result_adapter import result_for_experiment
+    from watermarking.generation import generate, generate_rnd
+    from watermarking.detection import phi,fast_permutation_test,permutation_test,seq_mc_permutation_test
+    from watermarking.attacks import substitution_attack,insertion_attack,deletion_attack
+
+    from watermarking.transform.score import transform_score,transform_edit_score
+    from watermarking.transform.sampler import transform_sampling
+    from watermarking.transform.key import transform_key_func
+
+    from watermarking.gumbel.score import gumbel_score,gumbel_edit_score
+    from watermarking.gumbel.sampler import gumbel_sampling
+    from watermarking.gumbel.key import gumbel_key_func
+
+    from watermarking.kirchenbauer.watermark_processor import WatermarkLogitsProcessor, WatermarkDetector
+
+    import os
+
+    results = defaultdict(dict)
+
+    results['args'] = copy.deepcopy(args)
+
+    # fix the random seed for reproducibility
+    t0 = time()
+    torch.manual_seed(args.seed)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    model = AutoModelForCausalLM.from_pretrained(args.model).to(device)
+
+    vocab_size = model.get_output_embeddings().weight.shape[0]
+    eff_vocab_size = vocab_size - args.truncate_vocab
+    print(f'Loaded the model (t = {time()-t0} seconds)')
+
+    dataset = load_dataset("c4", "realnewslike", split="train", streaming=True, trust_remote_code=True)
+
+    def corrupt(tokens):
+        tokens = deletion_attack(tokens,args.deletion)
+        tokens = insertion_attack(tokens,args.insertion,eff_vocab_size)
+        tokens = substitution_attack(tokens,args.substitution,eff_vocab_size)
+
+        return tokens
+
+    T = args.T                  # number of prompts/generations
+    n_batches = int(np.ceil(T / args.batch_size)) # number of batches
+    prompt_tokens = args.prompt_tokens      # minimum prompt length
+    new_tokens = args.m     # number of tokens to generate
+    buffer_tokens = args.buffer_tokens
+    if args.k == 0:
+        k = args.m # k is the block size (= number of tokens)
+    else:
+        k = args.k
+    n = args.n     # watermark key length
+
+    if args.rt_translate:
+        if args.language == "french":
+            en_ne_model_name = "Helsinki-NLP/opus-mt-tc-big-en-fr"
+            en_ne_tokenizer = MarianTokenizer.from_pretrained(en_ne_model_name)
+            en_ne_model = MarianMTModel.from_pretrained(en_ne_model_name).to(device)
+
+            ne_en_model_name = "Helsinki-NLP/opus-mt-tc-big-fr-en"
+            ne_en_tokenizer = MarianTokenizer.from_pretrained(ne_en_model_name)
+            ne_en_model = MarianMTModel.from_pretrained(ne_en_model_name).to(device)
+        elif args.language == "russian":
+            en_ne_model_name = "Helsinki-NLP/opus-mt-en-ru"
+            en_ne_tokenizer = MarianTokenizer.from_pretrained(en_ne_model_name)
+            en_ne_model = MarianMTModel.from_pretrained(en_ne_model_name).to(device)
+
+            ne_en_model_name = "Helsinki-NLP/opus-mt-ru-en"
+            ne_en_tokenizer = MarianTokenizer.from_pretrained(ne_en_model_name)
+            ne_en_model = MarianMTModel.from_pretrained(ne_en_model_name).to(device)
+        else:
+            raise
+
+        def rt_translate(text):
+            try:
+                tokens = en_ne_tokenizer(text.split('. '), return_tensors="pt", padding=True).to(device)
+                tokens = en_ne_model.generate(**tokens,max_new_tokens=52)
+                french_text = ' '.join([en_ne_tokenizer.decode(t, skip_special_tokens=True) for t in tokens])
+
+                tokens = ne_en_tokenizer(french_text.split('. '), return_tensors="pt", padding=True).to(device)
+                tokens = ne_en_model.generate(**tokens,max_new_tokens=512)
+                roundtrip_text = ' '.join([ne_en_tokenizer.decode(t, skip_special_tokens=True) for t in tokens])
+            except Exception as exc:
+                raise RuntimeError("Round-trip translation failed") from exc
+            return roundtrip_text
+
+    # this is the "key" for the watermark
+    # for now each generation gets its own key
+    seeds = torch.randint(2**32, (T,))
+
+    if args.method == "transform":
+        generate_watermark = lambda prompt,seed : generate(model,
+                                                           prompt,
+                                                           vocab_size,
+                                                           n,
+                                                           new_tokens+buffer_tokens,
+                                                           seed,
+                                                           transform_key_func,
+                                                           transform_sampling,
+                                                           random_offset=args.offset)
+
+        if args.edit is True:
+            dist = lambda x,y : transform_edit_score(x,y,gamma=args.gamma)
+        else:
+            dist = lambda x,y : transform_score(x,y)
+        test_stat = lambda tokens,n,k,generator,vocab_size,null=False : phi(tokens=tokens,
+                                                                            n=n,
+                                                                            k=k,
+                                                                            generator=generator,
+                                                                            key_func=transform_key_func,
+                                                                            vocab_size=vocab_size,
+                                                                            dist=dist,
+                                                                            null=False,
+                                                                            normalize=True)
+
+    elif args.method == "gumbel":
+        generate_watermark = lambda prompt,seed : generate(model,
+                                                           prompt,
+                                                           vocab_size,
+                                                           n,
+                                                           new_tokens+buffer_tokens,
+                                                           seed,
+                                                           gumbel_key_func,
+                                                           gumbel_sampling,
+                                                           random_offset=args.offset)
+
+        if args.edit is True:
+            dist = lambda x,y : gumbel_edit_score(x,y,gamma=args.gamma)
+        else:
+            dist = lambda x,y : gumbel_score(x,y)
+        test_stat = lambda tokens,n,k,generator,vocab_size,null=False : phi(tokens=tokens,
+                                                                            n=n,
+                                                                            k=k,
+                                                                            generator=generator,
+                                                                            key_func=gumbel_key_func,
+                                                                            vocab_size=vocab_size,
+                                                                            dist=dist,
+                                                                            null=null,
+                                                                            normalize=False)
+
+    elif args.method == "kirchenbauer":
+        watermark_processor = WatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
+                                                   gamma=args.kirch_gamma,
+                                                   delta=args.kirch_delta,
+                                                   seeding_scheme="simple_1")
+
+        watermark_detector = WatermarkDetector(vocab=list(tokenizer.get_vocab().values()),
+                                                gamma=args.kirch_gamma, # should match original setting
+                                                seeding_scheme="simple_1", # should match original setting
+                                                device=model.device, # must match the original rng device type
+                                                tokenizer=tokenizer,
+                                                z_threshold=1.5,
+                                                normalizers=[],
+                                                ignore_repeated_bigrams=False)
+
+        generate_watermark = lambda prompt,seed=None : model.generate(
+                                                            prompt.to(model.device),
+                                                            do_sample=True,
+                                                            max_new_tokens=new_tokens+buffer_tokens,
+                                                            min_new_tokens=new_tokens+buffer_tokens,
+                                                            top_k=0,
+                                                            logits_processor=LogitsProcessorList([watermark_processor])).cpu()
+
+        def test_stat_wrapper(tokens):
+            try:
+                return torch.tensor(-watermark_detector.detect(tokenizer.decode(tokens, skip_special_tokens=True))['z_score'])
+            except:
+                return torch.tensor(0.0)
+        test_stat = lambda tokens,n,k,generator,vocab_size,null=False : test_stat_wrapper(tokens)
     else:
         raise
-    
-    def rt_translate(text):
-        try:
-            tokens = en_ne_tokenizer(text.split('. '), return_tensors="pt", padding=True).to(device)
-            tokens = en_ne_model.generate(**tokens,max_new_tokens=52)
-            french_text = ' '.join([en_ne_tokenizer.decode(t, skip_special_tokens=True) for t in tokens])
 
-            tokens = ne_en_tokenizer(french_text.split('. '), return_tensors="pt", padding=True).to(device)
-            tokens = ne_en_model.generate(**tokens,max_new_tokens=512)
-            roundtrip_text = ' '.join([ne_en_tokenizer.decode(t, skip_special_tokens=True) for t in tokens])
-        except:
-            roundtrip_text = ""
-        return roundtrip_text
+    ds_iterator = iter(dataset)
 
-# this is the "key" for the watermark
-# for now each generation gets its own key
-seeds = torch.randint(2**32, (T,))
+    if args.test == 'fast':
+        null_results = []
+        generator = torch.Generator()
+        pbar = tqdm(total=args.n_runs)
+        run = 0
+        while run < args.n_runs:
+            example = next(ds_iterator)
+            text = example['text']
 
-if args.method == "transform":
-    generate_watermark = lambda prompt,seed : generate(model,
-                                                       prompt,
-                                                       vocab_size,
-                                                       n,
-                                                       new_tokens+buffer_tokens,
-                                                       seed,
-                                                       transform_key_func,
-                                                       transform_sampling,
-                                                       random_offset=args.offset)
+            tokens = tokenizer.encode(text, return_tensors='pt', truncation=True, max_length=2048-buffer_tokens)[0]
+            if len(tokens) < prompt_tokens + new_tokens:
+                continue
+            tokens = tokens[-new_tokens:]
 
-    if args.edit is True:
-        dist = lambda x,y : transform_edit_score(x,y,gamma=args.gamma)
-    else:
-        dist = lambda x,y : transform_score(x,y)
-    test_stat = lambda tokens,n,k,generator,vocab_size,null=False : phi(tokens=tokens,
-                                                                        n=n,
-                                                                        k=k,
-                                                                        generator=generator,
-                                                                        key_func=transform_key_func,
-                                                                        vocab_size=vocab_size,
-                                                                        dist=dist,
-                                                                        null=False,
-                                                                        normalize=True)
+            seed = torch.randint(high=args.max_seed,size=(1,)).item()
+            generator.manual_seed(int(seed))
+            null_result = test_stat(tokens=tokens,
+                                    n=n,
+                                    k=k,
+                                    generator=generator,
+                                    vocab_size=vocab_size,
+                                    null=True)
 
-elif args.method == "gumbel":
-    generate_watermark = lambda prompt,seed : generate(model,
-                                                       prompt,
-                                                       vocab_size,
-                                                       n,
-                                                       new_tokens+buffer_tokens,
-                                                       seed,
-                                                       gumbel_key_func,
-                                                       gumbel_sampling,
-                                                       random_offset=args.offset)
+            null_results.append(null_result)
+            run += 1
+            pbar.update(1)
 
-    if args.edit is True:
-        dist = lambda x,y : gumbel_edit_score(x,y,gamma=args.gamma)
-    else:
-        dist = lambda x,y : gumbel_score(x,y)
-    test_stat = lambda tokens,n,k,generator,vocab_size,null=False : phi(tokens=tokens,
-                                                                        n=n,
-                                                                        k=k,
-                                                                        generator=generator,
-                                                                        key_func=gumbel_key_func,
-                                                                        vocab_size=vocab_size,
-                                                                        dist=dist,
-                                                                        null=null,
-                                                                        normalize=False)
-                                                                                   
-elif args.method == "kirchenbauer":
-    watermark_processor = WatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
-                                               gamma=args.kirch_gamma,
-                                               delta=args.kirch_delta,
-                                               seeding_scheme="simple_1")
+        null_results = torch.sort(torch.tensor(null_results)).values
 
-    watermark_detector = WatermarkDetector(vocab=list(tokenizer.get_vocab().values()),
-                                            gamma=args.kirch_gamma, # should match original setting
-                                            seeding_scheme="simple_1", # should match original setting
-                                            device=model.device, # must match the original rng device type
-                                            tokenizer=tokenizer,
-                                            z_threshold=1.5,
-                                            normalizers=[],
-                                            ignore_repeated_bigrams=False)
-    
-    generate_watermark = lambda prompt,seed=None : model.generate(
-                                                        prompt.to(model.device),
-                                                        do_sample=True,
-                                                        max_new_tokens=new_tokens+buffer_tokens,
-                                                        min_new_tokens=new_tokens+buffer_tokens,
-                                                        top_k=0,
-                                                        logits_processor=LogitsProcessorList([watermark_processor])).cpu()
+    if args.test == 'fast':
+        test = lambda tokens,seed : fast_permutation_test(tokens,
+                                                        vocab_size,
+                                                        n,
+                                                        k,
+                                                        seed,
+                                                        test_stat,
+                                                        null_results)
+    elif args.test == 'sequential_mc':
+        test = lambda tokens,seed : seq_mc_permutation_test(tokens,
+                                                    vocab_size,
+                                                    n,
+                                                    k,
+                                                    seed,
+                                                    test_stat,
+                                                    args.n_runs,
+                                                    alpha=args.alpha,
+                                                    c=args.c)
 
-    def test_stat_wrapper(tokens):
-        try:
-            return torch.tensor(-watermark_detector.detect(tokenizer.decode(tokens, skip_special_tokens=True))['z_score'])
-        except:
-            return torch.tensor(0.0)
-    test_stat = lambda tokens,n,k,generator,vocab_size,null=False : test_stat_wrapper(tokens)
-else:
-    raise
+    elif args.test == 'permutation':
+        test = lambda tokens,seed: permutation_test(tokens,
+                                                    vocab_size,
+                                                    n,
+                                                    k,
+                                                    seed,
+                                                    test_stat,
+                                                    n_runs=args.n_runs)
 
-ds_iterator = iter(dataset)
+    results['trials'] = []
+    def record_test(tokens, seed, label, sample_id):
+        started = time()
+        raw = test(tokens, seed)
+        pval, used = result_for_experiment(args.test, raw, args.n_runs)
+        row = dict(sample_id=sample_id, label=label, seed=int(seed), tokens=tokens.tolist(),
+                   pvalue=float(pval), resamples=int(used), detection_seconds=time()-started,
+                   rejected=bool(pval <= args.alpha))
+        if args.test == 'sequential_mc':
+            row['wealth'] = [float(x) for x in raw[1]]
+            row['scores'] = [-float(x) for x in raw[2]]
+            row['stop_reason'] = ('rejected' if row['rejected'] else
+                'futility' if raw[1][-1] < args.alpha else 'budget_exhausted')
+        else:
+            row['stop_reason'] = 'fixed_budget' if args.test == 'permutation' else 'shared_reference'
+        results['trials'].append(row)
+        return pval, used
 
-if args.test == 'fast':
-    null_results = []
-    generator = torch.Generator()
-    pbar = tqdm(total=args.n_runs)
-    run = 0
-    while run < args.n_runs:
+    t1 = time()
+
+    prompts = []
+    itm = 0
+    while itm < T:
         example = next(ds_iterator)
         text = example['text']
 
         tokens = tokenizer.encode(text, return_tensors='pt', truncation=True, max_length=2048-buffer_tokens)[0]
         if len(tokens) < prompt_tokens + new_tokens:
             continue
-        tokens = tokens[-new_tokens:]
+        prompt = tokens[-(new_tokens+prompt_tokens):-new_tokens]
+        prompts.append(prompt)
 
-        seed = torch.randint(high=args.max_seed,size=(1,)).item()
-        generator.manual_seed(int(seed))
-        null_result = test_stat(tokens=tokens,
-                                n=n,
-                                k=k,
-                                generator=generator,
-                                vocab_size=vocab_size,
-                                null=True)
+        itm += 1
 
-        null_results.append(null_result)
-        run += 1
+    prompts = torch.vstack(prompts)
+    results['prompts'] = copy.deepcopy(prompts)
+
+    null_samples = []
+    watermarked_samples = []
+    for batch in tqdm(range(n_batches)):
+        idx = torch.arange(batch * args.batch_size,min(T,(batch + 1) * args.batch_size))
+
+        null_samples.append(generate_rnd(prompts[idx],new_tokens+buffer_tokens,model)[:,prompt_tokens:])
+        watermarked_samples.append(generate_watermark(prompts[idx], seeds[idx])[:,prompt_tokens:])
+    null_samples = torch.vstack(null_samples)
+    watermarked_samples = torch.vstack(watermarked_samples)
+
+    results['watermark']['tokens'] = copy.deepcopy(watermarked_samples)
+    results['null']['tokens'] = copy.deepcopy(null_samples)
+
+    null_samples = torch.clip(null_samples,max=eff_vocab_size-1)
+    watermarked_samples = torch.clip(watermarked_samples,max=eff_vocab_size-1)
+
+    print(f'Generated samples in (t = {time()-t1} seconds)')
+
+    pvals_watermark = []
+    permumation_time_watermark = []
+    pvals_null = []
+    permumation_time_null = []
+    pbar = tqdm(total=T)
+    for itm in range(T):
+        null_sample = null_samples[itm]
+        null_sample = corrupt(null_sample)
+        null_sample = tokenizer.decode(null_sample, skip_special_tokens=True)
+        if args.rt_translate:
+            null_sample = rt_translate(null_sample)
+        null_sample = tokenizer.encode(null_sample,
+                                       return_tensors='pt',
+                                       truncation=True,
+                                       max_length=2048)[0]
+        if len(null_sample) < new_tokens + 1:
+            null_sample = torch.nn.functional.pad(null_sample,(new_tokens-len(null_sample),0),"constant",0)
+        else:
+            null_sample = null_sample[1:new_tokens+1]
+        pval, tim = record_test(null_sample, seeds[itm], "null", itm)
+
+        pvals_null.append(pval)
+        permumation_time_null.append(tim)
+
+        watermarked_sample = watermarked_samples[itm]
+        watermarked_sample = corrupt(watermarked_sample)
+        watermarked_sample = tokenizer.decode(watermarked_sample, skip_special_tokens=True)
+        if args.rt_translate:
+            watermarked_sample = rt_translate(watermarked_sample)
+        watermarked_sample = tokenizer.encode(watermarked_sample,
+                                              return_tensors='pt',
+                                              truncation=True,
+                                              max_length=2048)[0]
+        if len(watermarked_sample) < new_tokens + 1:
+            watermarked_sample = torch.nn.functional.pad(watermarked_sample,(new_tokens-len(watermarked_sample),0),"constant",0)
+        else:
+            watermarked_sample = watermarked_sample[1:new_tokens+1]
+        # pval = test(watermarked_sample, seeds[itm])
+        pval, tim = record_test(watermarked_sample, seeds[itm], "watermark", itm)
+
+        pvals_watermark.append(pval)
+        permumation_time_watermark.append(tim)
+
         pbar.update(1)
 
-    null_results = torch.sort(torch.tensor(null_results)).values
+    pbar.close()
 
-if args.test == 'fast':
-    test = lambda tokens,seed : fast_permutation_test(tokens,
-                                                    vocab_size,
-                                                    n,
-                                                    k,
-                                                    seed,
-                                                    test_stat,
-                                                    null_results)
-elif args.test == 'sequential_mc':
-    test = lambda tokens,seed : seq_mc_permutation_test(tokens,
-                                                vocab_size,
-                                                n,
-                                                k,
-                                                seed,
-                                                test_stat,
-                                                args.n_runs,
-                                                alpha=args.alpha,
-                                                c=args.c)
-
-elif args.test == 'permutation':
-    test = lambda tokens,seed: permutation_test(tokens,
-                                                vocab_size,
-                                                n,
-                                                k,
-                                                seed,
-                                                test_stat,
-                                                n_runs=args.n_runs)
-
-t1 = time()
-
-prompts = []
-itm = 0
-while itm < T:
-    example = next(ds_iterator)
-    text = example['text']
-
-    tokens = tokenizer.encode(text, return_tensors='pt', truncation=True, max_length=2048-buffer_tokens)[0]
-    if len(tokens) < prompt_tokens + new_tokens:
-        continue
-    prompt = tokens[-(new_tokens+prompt_tokens):-new_tokens]
-    prompts.append(prompt)
-
-    itm += 1
-    
-prompts = torch.vstack(prompts)
-results['prompts'] = copy.deepcopy(prompts)
-
-null_samples = []
-watermarked_samples = []
-for batch in tqdm(range(n_batches)):
-    idx = torch.arange(batch * args.batch_size,min(T,(batch + 1) * args.batch_size))
-
-    null_samples.append(generate_rnd(prompts[idx],new_tokens+buffer_tokens,model)[:,prompt_tokens:])
-    watermarked_samples.append(generate_watermark(prompts[idx], seeds[idx])[:,prompt_tokens:])
-null_samples = torch.vstack(null_samples)
-watermarked_samples = torch.vstack(watermarked_samples)
-
-results['watermark']['tokens'] = copy.deepcopy(watermarked_samples)
-results['null']['tokens'] = copy.deepcopy(null_samples)
-
-null_samples = torch.clip(null_samples,max=eff_vocab_size-1)
-watermarked_samples = torch.clip(watermarked_samples,max=eff_vocab_size-1)
-
-print(f'Generated samples in (t = {time()-t1} seconds)')
-
-pvals_watermark = []
-permumation_time_watermark = []
-pvals_null = []
-permumation_time_null = []
-pbar = tqdm(total=T)
-for itm in range(T):
-    null_sample = null_samples[itm]
-    null_sample = corrupt(null_sample)
-    null_sample = tokenizer.decode(null_sample, skip_special_tokens=True)
-    if args.rt_translate:
-        null_sample = rt_translate(null_sample)
-    null_sample = tokenizer.encode(null_sample,
-                                   return_tensors='pt',
-                                   truncation=True,
-                                   max_length=2048)[0]
-    if len(null_sample) < new_tokens + 1:
-        null_sample = torch.nn.functional.pad(null_sample,(new_tokens-len(null_sample),0),"constant",0)
-    else:
-        null_sample = null_sample[1:new_tokens+1]
-    pval, tim = result_for_experiment(args.test, test(null_sample, seeds[itm]), args.n_runs)
-
-    pvals_null.append(pval)
-    permumation_time_null.append(tim)
-
-    watermarked_sample = watermarked_samples[itm]
-    watermarked_sample = corrupt(watermarked_sample)
-    watermarked_sample = tokenizer.decode(watermarked_sample, skip_special_tokens=True)
-    if args.rt_translate:
-        watermarked_sample = rt_translate(watermarked_sample)
-    watermarked_sample = tokenizer.encode(watermarked_sample,
-                                          return_tensors='pt',
-                                          truncation=True,
-                                          max_length=2048)[0]
-    if len(watermarked_sample) < new_tokens + 1:
-        watermarked_sample = torch.nn.functional.pad(watermarked_sample,(new_tokens-len(watermarked_sample),0),"constant",0)
-    else:
-        watermarked_sample = watermarked_sample[1:new_tokens+1]
-    # pval = test(watermarked_sample, seeds[itm])
-    pval, tim = result_for_experiment(args.test, test(watermarked_sample, seeds[itm]), args.n_runs)
-
-    pvals_watermark.append(pval)
-    permumation_time_watermark.append(tim)
-
-    pbar.update(1)
-
-pbar.close()
-
-results['time'] = time()-t1
-print(f"Ran the experiment (t = {results['time']} seconds)")
+    results['time'] = time()-t1
+    print(f"Ran the experiment (t = {results['time']} seconds)")
 
 
-results['watermark']['pvals'] = pvals_watermark
-results['null']['pvals'] = pvals_null
-results['watermark']['tim'] = permumation_time_watermark
-results['null']['tim'] = permumation_time_null
+    results['watermark']['pvals'] = pvals_watermark
+    results['null']['pvals'] = pvals_null
+    results['watermark']['tim'] = permumation_time_watermark
+    results['null']['tim'] = permumation_time_null
 
-pickle.dump(results,open(args.save,"wb"))
+    from pathlib import Path
+    import json, platform, subprocess
+    output = Path(args.save)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    pickle.dump(results, output.open("wb"))
+    manifest = dict(schema_version=1, kind="new_research_run", settings=vars(args),
+        source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+        python=platform.python_version(), device=str(device), trials=results['trials'],
+        model_revision=getattr(model.config, '_commit_hash', None),
+        tokenizer_revision=tokenizer.init_kwargs.get('_commit_hash'),
+        dataset="c4/realnewslike", dataset_revision=None)
+    output.with_suffix('.json').write_text(json.dumps(manifest, allow_nan=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

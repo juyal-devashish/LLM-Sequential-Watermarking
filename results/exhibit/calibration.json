@@ -1,0 +1,25 @@
+{
+  "kind": "synthetic_exchangeable_score_calibration",
+  "seed": 20261101,
+  "trials": 5000,
+  "budget": 100,
+  "alpha": 0.05,
+  "c": 0.04,
+  "source_commit": "a5aa9598b74d66dc82ac0ab5477b39bb7f27a566",
+  "note": "Same Uniform(0,1) observed/null scores for both tests. Not text detection performance.",
+  "sequential_rejections": 163,
+  "fixed_rejections": 246,
+  "sequential_rate": 0.0326,
+  "fixed_rate": 0.0492,
+  "sequential_median_resamples": 3.0,
+  "sequential_wilson95": [
+    0.028025191999595418,
+    0.037892482133015014
+  ],
+  "fixed_wilson95": [
+    0.04354328467999217,
+    0.0555489008120506
+  ],
+  "source_worktree_dirty": true,
+  "detector_sha256": "42b7914801483d00122af237a9dfa04b16587f07bd4efef9ccb2a5fb86186b98"
+}

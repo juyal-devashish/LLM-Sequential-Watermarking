@@ -1,90 +1,98 @@
+"""Conditional key-randomization tests; lower alignment scores favor a watermark."""
+from dataclasses import dataclass, asdict
+import math
 import torch
-import scipy
-import numpy as np
+from scipy.stats import binom
 
-def seq_mc_permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_seed=100000,alpha=0.05,c=0.04):
-    generator = torch.Generator()
-    generator.manual_seed(int(seed))
 
-    # Note: we flip the statistic sign to align with seq MC permutation paper
-    neg_test_stat = lambda *args, **kwargs: -test_stat(*args, **kwargs)
+@dataclass
+class TestResult:
+    pvalue: float
+    resamples: int
+    rejected: bool
+    stop_reason: str
+    wealth: list
+    statistics: list
 
-    W = 1 # the bettor's wealth
-    L = 0 # numer of "successes" so far
+    def to_dict(self):
+        return asdict(self)
 
-    phi_0 = neg_test_stat(tokens=tokens,
-                            n=n,
-                            k=k,
-                            generator=generator,
-                            vocab_size=vocab_size)
-    Ws, phis = [W], [phi_0]
-    tim = 0
-    for t in range(n_runs):
 
-        pi = torch.randperm(vocab_size)
-        tokens = torch.argsort(pi)[tokens]
-        
-        seed = torch.randint(high=max_seed,size=(1,)).item()
-        generator.manual_seed(int(seed))
-        phi_t = neg_test_stat(tokens=tokens,
-                                n=n,
-                                k=k,
-                                generator=generator,
-                                vocab_size=vocab_size,
-                                null=True)
-        
-        if phi_t >= phi_0:
-            L += 1
-        
-        W = (1 - scipy.stats.binom(n = t + 1, p = c).cdf(L)) / c
-        Ws.append(W); phis.append(phi_t)
+def test_scores(observed, null_scores, alpha=0.05, c=0.04, sequential=True):
+    """Test a fixed observed score using a stream of exchangeable null scores.
 
-        if W >= 1/alpha or W < alpha:
-            tim = t + 1
+    Uniform-mixture wealth: Fischer/Ramdas Proposition 5.2. Ties count as
+    losses (conservative). Futility is not evidence that the null is true.
+    """
+    if not 0 < c < alpha < 1:
+        raise ValueError("Require 0 < c < alpha < 1")
+    observed = float(observed)
+    if not math.isfinite(observed):
+        raise ValueError("Scores must be finite")
+    wealth, statistics, losses = [1.0], [observed], 0
+    reason = "budget_exhausted"
+    for b, score in enumerate(null_scores, 1):
+        score = float(score)
+        if not math.isfinite(score):
+            raise ValueError("Scores must be finite")
+        statistics.append(score)
+        losses += score <= observed
+        w = float(binom.sf(losses, b + 1, c) / c)
+        wealth.append(w)
+        if sequential and (w >= 1 / alpha or w < alpha):
+            reason = "rejected" if w >= 1 / alpha else "futility"
             break
-    if tim == 0:
-        tim = n_runs
+    b = len(statistics) - 1
+    if not b:
+        raise ValueError("At least one null score is required")
+    pvalue = 1 / max(wealth) if sequential else (losses + 1) / (b + 1)
+    rejected = pvalue <= alpha
+    return TestResult(pvalue, b, rejected, reason if sequential else "fixed_budget", wealth, statistics)
 
-    return 1 / max(Ws), Ws, phis, tim
+# Do not let pytest treat this public function as a test case.
+test_scores.__test__ = False
 
-def permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_seed=100000):
-    generator = torch.Generator()
-    generator.manual_seed(int(seed))
 
-    test_result = test_stat(tokens=tokens,
-                            n=n,
-                            k=k,
-                            generator=generator,
-                            vocab_size=vocab_size)
-    p_val = 0
-    for run in range(n_runs):
-        pi = torch.randperm(vocab_size)
-        tokens = torch.argsort(pi)[tokens]
-        
-        seed = torch.randint(high=max_seed,size=(1,)).item()
-        generator.manual_seed(int(seed))
-        null_result = test_stat(tokens=tokens,
-                                n=n,
-                                k=k,
-                                generator=generator,
-                                vocab_size=vocab_size,
-                                null=True)
-        # assuming lower test values indicate presence of watermark
-        p_val += (null_result <= test_result).float() / n_runs
-    
-    return p_val
+def _scores(tokens, vocab_size, n, k, seed, test_stat, n_runs, max_seed):
+    if n_runs < 1 or max_seed < 1:
+        raise ValueError("Budget and seed range must be positive")
+    if tokens.ndim != 1 or len(tokens) < k or not 1 <= k or n < 1:
+        raise ValueError("Require nonempty 1D tokens, 1 <= k <= len(tokens), n >= 1")
+    if vocab_size < 1 or bool(((tokens < 0) | (tokens >= vocab_size)).any()):
+        raise ValueError("Token outside vocabulary")
+    generator = torch.Generator().manual_seed(int(seed))
+    observed = test_stat(tokens=tokens, n=n, k=k, generator=generator, vocab_size=vocab_size)
+    # Independent local RNG: testing does not change generation or attack RNG state.
+    rng = torch.Generator().manual_seed((int(seed) + 1) % (2**32))
+    def stream():
+        for _ in range(n_runs):
+            generator.manual_seed(int(torch.randint(max_seed, (1,), generator=rng).item()))
+            # Keep text and statistic identical; only the watermark key varies.
+            yield test_stat(tokens=tokens, n=n, k=k, generator=generator,
+                            vocab_size=vocab_size, null=False)
+    return observed, stream()
+
+
+def seq_mc_permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_seed=2**32,alpha=0.05,c=0.04):
+    observed, scores = _scores(tokens,vocab_size,n,k,seed,test_stat,n_runs,max_seed)
+    result = test_scores(observed,scores,alpha,c)
+    # Legacy tuple preserves the sign convention of historical caller traces.
+    return result.pvalue, result.wealth, [-x for x in result.statistics], result.resamples
+
+
+def permutation_test(tokens,vocab_size,n,k,seed,test_stat,n_runs=100,max_seed=2**32):
+    observed, scores = _scores(tokens,vocab_size,n,k,seed,test_stat,n_runs,max_seed)
+    return test_scores(observed,scores,sequential=False).pvalue
+
 
 def fast_permutation_test(tokens,vocab_size,n,k,seed,test_stat,null_results):
-    generator = torch.Generator()
-    generator.manual_seed(int(seed))
-
-    test_result = test_stat(tokens=tokens,
-                            n=n,
-                            k=k,
-                            generator=generator,
-                            vocab_size=vocab_size)
-    p_val = torch.searchsorted(null_results,test_result,right=True) / len(null_results)
-    return p_val
+    if len(null_results) == 0:
+        raise ValueError("Null reference must not be empty")
+    if not bool(torch.isfinite(null_results).all()) or not bool((null_results[1:] >= null_results[:-1]).all()):
+        raise ValueError("Null reference must be finite and sorted")
+    generator = torch.Generator().manual_seed(int(seed))
+    score = test_stat(tokens=tokens,n=n,k=k,generator=generator,vocab_size=vocab_size)
+    return (torch.searchsorted(null_results,score,right=True).item() + 1) / (len(null_results) + 1)
 
 def phi(tokens,n,k,generator,key_func,vocab_size,dist,null=False,normalize=False):
     if null:
@@ -106,6 +114,8 @@ def phi(tokens,n,k,generator,key_func,vocab_size,dist,null=False,normalize=False
 def adjacency(tokens,xi,dist,k):
     m = len(tokens)
     n = len(xi)
+    if not 1 <= k <= m or n < 1:
+        raise ValueError("Require 1 <= k <= token count and a nonempty key")
 
     A = torch.empty(size=(m-(k-1),n))
     for i in range(m-(k-1)):
