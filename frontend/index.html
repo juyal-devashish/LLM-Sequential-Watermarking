@@ -1,80 +1,397 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#edf1f5">
-  <title>Sequential Watermarking | Research Exhibit</title>
-  <meta name="description" content="How much evidence is enough? Explore sequential testing for language model watermarks through an interactive illustration and original research figures.">
-  <link rel="stylesheet" href="style.css">
-  <script defer src="app.js"></script>
-</head>
-<body>
-<a class="skip" href="#main">Skip to content</a>
-<header class="site-header">
-  <nav class="wrap navigation" aria-label="Main navigation">
-    <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 24h5V15h5v5h5V9h5v4h6"/></svg><span>Sequential Watermarking<small>A language model research project</small></span></a>
-    <div class="navlinks"><a href="#lab">Explore</a><a href="#method">Method</a><a href="#results">Results</a><a class="source-link" href="https://github.com/juyal-devashish/LLM-Sequential-Watermarking">GitHub <span aria-hidden="true">↗</span></a></div>
-  </nav>
-</header>
-<main id="main">
-<section class="wrap opening" id="top">
-  <div class="project-context"><span>University of Michigan</span><span>CSE 598 / Winter 2025</span></div>
-  <div class="hero">
-    <div class="hero-copy">
-      <h1>How much evidence is enough?</h1>
-      <p class="lead">Finding a watermark in AI-generated text, one comparison at a time.</p>
-      <p class="summary">A fixed-budget test keeps comparing until its budget runs out. A sequential test checks along the way—and can stop when it has enough evidence.</p>
-      <a class="report-link" href="assets/Final%20Report.pdf">Read the research report <span aria-hidden="true">↗</span></a>
-      <div class="hero-note"><span class="note-mark" aria-hidden="true">↳</span><p>Try the monitor. Change the signal and watch when the illustration reaches its stopping point.</p></div>
-    </div>
-    <div class="monitor" id="lab" aria-labelledby="monitor-title">
-      <div class="monitor-heading"><h2 id="monitor-title">Evidence monitor</h2><span class="simulation-label">Teaching simulation</span></div>
-      <div class="scenario-control" role="group" aria-label="Choose a teaching scenario">
-        <button data-case="strong" aria-pressed="false">Strong signal</button><button data-case="weak" aria-pressed="true">Weak signal</button><button data-case="null" aria-pressed="false">Chance-like</button>
-      </div>
-      <div class="monitor-readout"><div><span class="readout-label">Comparisons</span><strong><span id="counter">0</span><small> / 80</small></strong></div><div class="decision"><span class="readout-label">Illustration status</span><span id="status" role="status">Ready to explore</span></div></div>
-      <div class="chart-wrap">
-        <svg id="chart" viewBox="0 0 600 240" role="img" aria-labelledby="chart-title chart-description">
-          <title id="chart-title">Synthetic evidence over comparisons</title><desc id="chart-description">Illustrative score, not a p-value. Use Run simulation or Next comparison to explore.</desc>
-          <g class="grid"><path d="M34 40H566M34 90H566M34 140H566M34 190H566"/><path d="M167 24V210M300 24V210M433 24V210M566 24V210"/></g>
-          <path class="threshold" d="M34 55H566"/><text class="threshold-text" x="566" y="44" text-anchor="end">Illustrative threshold</text>
-          <path class="baseline" d="M34 125H566"/>
-          <g class="axis-labels"><text x="20" y="59" text-anchor="end">7</text><text x="20" y="129" text-anchor="end">0</text><text x="20" y="199" text-anchor="end">−7</text><text x="34" y="231">0</text><text x="300" y="231" text-anchor="middle">40</text><text x="566" y="231" text-anchor="end">80</text></g>
-          <path id="area" d=""/><polyline id="trace" points=""/><circle id="cursor" r="4" cx="34" cy="125"/>
-        </svg>
-        <div class="chart-foot"><span><i></i> Synthetic evidence</span><span>Number of comparisons</span></div>
-      </div>
-      <label class="scrub-label" for="scrub">Explore the trace <span id="position">0 of 9</span></label><input id="scrub" type="range" min="0" max="9" value="0" aria-label="Comparison in the simulated trace">
-      <div class="monitor-controls"><button id="play" class="run-button">Run simulation <span aria-hidden="true">▶</span></button><button id="step" class="step-button">Next comparison</button><button id="reset" class="reset-button" aria-label="Reset simulation">↺</button></div>
-      <p id="scenario-note" class="scenario-note">A clear signal can reach the threshold with fewer comparisons.</p>
-      <details class="simulation-details"><summary>What does this illustrate?</summary><p>A seeded random walk adds +1 or −1 per comparison and stops at +7 or 80 comparisons. It is not the research detector, a p-value, or experimental data. Chance-like paths can also cross this illustrative threshold; no error guarantee applies to this animation.</p></details>
-    </div>
-  </div>
-  <div class="setup-strip" aria-label="Historical report settings"><div class="setup-title">Inside the<br><strong>original experiment</strong></div><dl><div><dt>Language model</dt><dd>OPT-1.3B</dd></div><div><dt>Text source</dt><dd>C4</dd></div><div><dt>Generated length</dt><dd>80 <small>tokens</small></dd></div><div><dt>Significance level</dt><dd>α = 0.05</dd></div><div><dt>Betting parameter</dt><dd>c = 0.04</dd></div></dl></div>
-</section>
-<section class="wrap method section" id="method">
-  <div class="section-heading"><h2>A hidden signal.<br>A measurable decision.</h2><p>A secret key guides word sampling. Detection asks whether the text aligns with that key more closely than it would with random alternatives.</p></div>
-  <div class="method-steps">
-    <article><div class="step-top"><span>01</span><svg viewBox="0 0 140 42" aria-hidden="true"><path d="M0 12h20m6 0h32m6 0h14m6 0h34M0 28h33m6 0h21m6 0h37"/></svg></div><h3>Generate with a key</h3><p>Watermarking changes how tokens are sampled, leaving a statistical signal in the output.</p></article>
-    <article><div class="step-top"><span>02</span><svg viewBox="0 0 140 42" aria-hidden="true"><path d="M4 30l20-15 20 5 20-12 20 16 20-8 20-10M4 34l20-6 20 6 20-8 20 7 20-4 20 4"/></svg></div><h3>Compare against chance</h3><p>The detector compares the text’s alignment with the shared key against randomized keys.</p></article>
-    <article><div class="step-top"><span>03</span><svg viewBox="0 0 140 42" aria-hidden="true"><path d="M0 32h22V22h22v5h22V12h22V3h26M0 10h130"/></svg></div><h3>Know when to stop</h3><p>Sequential testing monitors evidence and may stop early for rejection or futility.</p></article>
-  </div>
-  <p class="interpretation"><strong>Keep the conclusion specific.</strong> No evidence for a watermark does not prove that a person wrote the text.</p>
-</section>
-<section class="results-section" id="results"><div class="wrap section">
-  <div class="section-heading"><div><span class="section-kicker">The original research</span><h2>Inspect the evidence.</h2></div><p>Detection quality is only half the story. Explore false positives, computational cost, and what happens when the text is edited.</p></div>
-  <div class="results-workspace">
-    <aside class="results-sidebar"><h3>Research question</h3><div class="result-choices" role="group" aria-label="Research figure category"><button data-result="detection" aria-pressed="true"><span>Detection quality</span><small>Power and false positives</small></button><button data-result="cost" aria-pressed="false"><span>Computational cost</span><small>Comparisons to a decision</small></button><button data-result="robustness" aria-pressed="false"><span>Robustness to edits</span><small>Attack and method comparisons</small></button></div><div class="reading-guide"><span>Reading the chart</span><p id="reading-guide">Read power and null rejection together. More detections are useful only if false positives stay controlled.</p></div><a class="provenance-link" href="assets/Final%20Report.pdf">See the full report <span aria-hidden="true">↗</span></a></aside>
-    <div class="figure-panel"><div class="figure-heading"><div><span class="historical-label">Historical figure</span><h3 id="figure-title">Power &amp; false positives</h3></div><a id="figure-link" class="image-link" href="assets/power%20and%20null%20rejection.png" target="_blank" rel="noopener">Open full size <span aria-hidden="true">↗</span></a></div>
-      <div id="robustness-controls" class="robustness-controls" hidden><label>Metric<select id="metric"><option value="power">Detection power</option><option value="nullrate">False-positive rate</option><option value="perms">Comparisons</option><option value="pval">P-values</option></select></label><label>Compare by<select id="grouping"><option value="attack">Attack type</option><option value="method">Watermark method</option></select></label></div>
-      <figure><div class="image-stage"><img id="figure-image" src="assets/power%20and%20null%20rejection.png" alt="Original research figure comparing detection power and null rejection rate across permutation budgets." loading="lazy"></div><figcaption id="figure-caption">Report setup: OPT-1.3B, 200 texts, 80 generated tokens, α = 0.05 and c = 0.04. Original project figure; not a new reproduction.</figcaption></figure>
-    </div>
-  </div>
-  <p class="evidence-note"><span aria-hidden="true">ⓘ</span> These are preserved research figures. Raw per-trial runs are not included in the repository; resample counts alone do not establish a wall-clock speedup. <a href="https://github.com/juyal-devashish/LLM-Sequential-Watermarking/blob/main/docs/VALIDATION.md">Validation status</a></p>
-</div></section>
-<section class="wrap section about" id="about"><div><span class="section-kicker">Behind the project</span><h2>Research is a<br>team effort.</h2><p>University of Michigan<br>CSE 598, Winter 2025</p></div><div><p class="contributors">Devashish Juyal, Emilio Cantu-Cervini, Zicheng Jin, and Sri Likhita Adru.</p><p>Devashish contributed the literature survey, sequential testing framework, detection implementation, proposed power and null-rejection experiments, and analysis of statistical validity. The research and experimental work were collaborative.</p><div class="resources"><a href="assets/Final%20Report.pdf">Final report <span>PDF ↗</span></a><a href="https://drive.google.com/file/d/1KNR2OcLC9Ueuu13OQ-wDDC5eKqOUWkYq/view">Project write-up <span>Drive ↗</span></a><a href="https://arxiv.org/abs/2307.15593">Watermarking paper <span>arXiv ↗</span></a><a href="https://arxiv.org/abs/2401.07365">Testing by betting <span>arXiv ↗</span></a></div></div></section>
-</main>
-<footer class="wrap"><span>Sequential Watermarking <small>Research exhibit</small></span><a href="#top">Back to top ↑</a></footer>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#edf1f5" />
+    <title>Sequential Watermarking | Research Exhibit</title>
+    <meta
+      name="description"
+      content="How much evidence is enough? Explore sequential testing for language model watermarks through an interactive illustration and original research figures."
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header">
+      <nav class="wrap navigation" aria-label="Main navigation">
+        <a class="brand" href="#top"
+          ><svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M3 24h5V15h5v5h5V9h5v4h6" /></svg
+          ><span
+            >Sequential Watermarking<small
+              >A language model research project</small
+            ></span
+          ></a
+        >
+        <div class="navlinks">
+          <a href="#lab">Explore</a><a href="#method">Method</a
+          ><a href="#results">Results</a
+          ><a
+            class="source-link"
+            href="https://github.com/juyal-devashish/LLM-Sequential-Watermarking"
+            >GitHub <span aria-hidden="true">↗</span></a
+          >
+        </div>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="wrap opening" id="top">
+        <div class="project-context">
+          <span>University of Michigan</span><span>CSE 598 / Winter 2025</span>
+        </div>
+        <div class="hero">
+          <div class="hero-copy">
+            <h1>How much evidence is enough?</h1>
+            <p class="lead">
+              Finding a watermark in AI-generated text, one comparison at a
+              time.
+            </p>
+            <p class="summary">
+              A fixed-budget test keeps comparing until its budget runs out. A
+              sequential test checks along the way—and can stop when it has
+              enough evidence.
+            </p>
+            <a class="report-link" href="assets/Final%20Report.pdf"
+              >Read the research report <span aria-hidden="true">↗</span></a
+            >
+            <div class="hero-note">
+              <span class="note-mark" aria-hidden="true">↳</span>
+              <p>
+                Try the monitor. Change the signal and watch when the
+                illustration reaches its stopping point.
+              </p>
+            </div>
+          </div>
+          <div class="monitor" id="lab" aria-labelledby="monitor-title">
+            <div class="monitor-heading">
+              <h2 id="monitor-title">Evidence monitor</h2>
+              <span class="simulation-label">Teaching simulation</span>
+            </div>
+            <div
+              class="scenario-control"
+              role="group"
+              aria-label="Choose a teaching scenario"
+            >
+              <button data-case="strong" aria-pressed="false">
+                Strong signal</button
+              ><button data-case="weak" aria-pressed="true">Weak signal</button
+              ><button data-case="null" aria-pressed="false">
+                Chance-like
+              </button>
+            </div>
+            <div class="monitor-readout">
+              <div>
+                <span class="readout-label">Comparisons</span
+                ><strong
+                  ><span id="counter">0</span><small> / 80</small></strong
+                >
+              </div>
+              <div class="decision">
+                <span class="readout-label">Illustration status</span
+                ><span id="status" role="status">Ready to explore</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <svg
+                id="chart"
+                viewBox="0 0 600 240"
+                preserveAspectRatio="none"
+                role="img"
+                aria-labelledby="chart-title chart-description"
+              >
+                <title id="chart-title">
+                  Synthetic evidence over comparisons
+                </title>
+                <desc id="chart-description">
+                  Illustrative score, not a p-value. Use Run simulation or Next
+                  comparison to explore.
+                </desc>
+                <g class="grid">
+                  <path d="M34 40H566M34 90H566M34 140H566M34 190H566" />
+                  <path d="M167 24V210M300 24V210M433 24V210M566 24V210" />
+                </g>
+                <path class="threshold" d="M34 55H566" />
+                <text class="threshold-text" x="566" y="44" text-anchor="end">
+                  Illustrative threshold
+                </text>
+                <path class="baseline" d="M34 125H566" />
+                <g class="axis-labels">
+                  <text x="20" y="59" text-anchor="end">7</text>
+                  <text x="20" y="129" text-anchor="end">0</text>
+                  <text x="20" y="199" text-anchor="end">−7</text>
+                  <text x="34" y="231">0</text>
+                  <text x="300" y="231" text-anchor="middle">40</text>
+                  <text x="566" y="231" text-anchor="end">80</text>
+                </g>
+                <path id="area" d="" />
+                <polyline id="trace" points="" />
+                <circle id="cursor" r="4" cx="34" cy="125" />
+              </svg>
+              <div class="chart-foot">
+                <span><i></i> Synthetic evidence</span
+                ><span>Number of comparisons</span>
+              </div>
+            </div>
+            <label class="scrub-label" for="scrub"
+              >Explore the trace <span id="position">0 of 9</span></label
+            ><input
+              id="scrub"
+              type="range"
+              min="0"
+              max="9"
+              value="0"
+              aria-label="Comparison in the simulated trace"
+            />
+            <div class="monitor-controls">
+              <button id="play" class="run-button">
+                Run simulation <span aria-hidden="true">▶</span></button
+              ><button id="step" class="step-button">Next comparison</button
+              ><button
+                id="reset"
+                class="reset-button"
+                aria-label="Reset simulation"
+              >
+                ↺
+              </button>
+            </div>
+            <p id="scenario-note" class="scenario-note">
+              A clear signal can reach the threshold with fewer comparisons.
+            </p>
+            <details class="simulation-details">
+              <summary>What does this illustrate?</summary>
+              <p>
+                A seeded random walk adds +1 or −1 per comparison and stops at
+                +7 or 80 comparisons. It is not the research detector, a
+                p-value, or experimental data. Chance-like paths can also cross
+                this illustrative threshold; no error guarantee applies to this
+                animation.
+              </p>
+            </details>
+          </div>
+        </div>
+        <div class="setup-strip" aria-label="Historical report settings">
+          <div class="setup-title">
+            Inside the<br /><strong>original experiment</strong>
+          </div>
+          <dl>
+            <div>
+              <dt>Language model</dt>
+              <dd>OPT-1.3B</dd>
+            </div>
+            <div>
+              <dt>Text source</dt>
+              <dd>C4</dd>
+            </div>
+            <div>
+              <dt>Generated length</dt>
+              <dd>80 <small>tokens</small></dd>
+            </div>
+            <div>
+              <dt>Significance level</dt>
+              <dd>α = 0.05</dd>
+            </div>
+            <div>
+              <dt>Betting parameter</dt>
+              <dd>c = 0.04</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+      <section class="wrap method section" id="method">
+        <div class="section-heading">
+          <h2>A hidden signal.<br />A measurable decision.</h2>
+          <p>
+            A secret key guides word sampling. Detection asks whether the text
+            aligns with that key more closely than it would with random
+            alternatives.
+          </p>
+        </div>
+        <div class="method-steps">
+          <article>
+            <div class="step-top">
+              <span>01</span
+              ><svg viewBox="0 0 140 42" aria-hidden="true">
+                <path d="M0 12h20m6 0h32m6 0h14m6 0h34M0 28h33m6 0h21m6 0h37" />
+              </svg>
+            </div>
+            <h3>Generate with a key</h3>
+            <p>
+              Watermarking changes how tokens are sampled, leaving a statistical
+              signal in the output.
+            </p>
+          </article>
+          <article>
+            <div class="step-top">
+              <span>02</span
+              ><svg viewBox="0 0 140 42" aria-hidden="true">
+                <path
+                  d="M4 30l20-15 20 5 20-12 20 16 20-8 20-10M4 34l20-6 20 6 20-8 20 7 20-4 20 4"
+                />
+              </svg>
+            </div>
+            <h3>Compare against chance</h3>
+            <p>
+              The detector compares the text’s alignment with the shared key
+              against randomized keys.
+            </p>
+          </article>
+          <article>
+            <div class="step-top">
+              <span>03</span
+              ><svg viewBox="0 0 140 42" aria-hidden="true">
+                <path d="M0 32h22V22h22v5h22V12h22V3h26M0 10h130" />
+              </svg>
+            </div>
+            <h3>Know when to stop</h3>
+            <p>
+              Sequential testing monitors evidence and may stop early for
+              rejection or futility.
+            </p>
+          </article>
+        </div>
+        <p class="interpretation">
+          <strong>Keep the conclusion specific.</strong> No evidence for a
+          watermark does not prove that a person wrote the text.
+        </p>
+      </section>
+      <section class="results-section" id="results">
+        <div class="wrap section">
+          <div class="section-heading">
+            <div>
+              <span class="section-kicker">The original research</span>
+              <h2>Inspect the evidence.</h2>
+            </div>
+            <p>
+              Detection quality is only half the story. Explore false positives,
+              computational cost, and what happens when the text is edited.
+            </p>
+          </div>
+          <div class="results-workspace">
+            <aside class="results-sidebar">
+              <h3>Research question</h3>
+              <div
+                class="result-choices"
+                role="group"
+                aria-label="Research figure category"
+              >
+                <button data-result="detection" aria-pressed="true">
+                  <span>Detection quality</span
+                  ><small>Power and false positives</small></button
+                ><button data-result="cost" aria-pressed="false">
+                  <span>Computational cost</span
+                  ><small>Comparisons to a decision</small></button
+                ><button data-result="robustness" aria-pressed="false">
+                  <span>Robustness to edits</span
+                  ><small>Attack and method comparisons</small>
+                </button>
+              </div>
+              <div class="reading-guide">
+                <span>Reading the chart</span>
+                <p id="reading-guide">
+                  Read power and null rejection together. More detections are
+                  useful only if false positives stay controlled.
+                </p>
+              </div>
+              <a class="provenance-link" href="assets/Final%20Report.pdf"
+                >See the full report <span aria-hidden="true">↗</span></a
+              >
+            </aside>
+            <div class="figure-panel">
+              <div class="figure-heading">
+                <div>
+                  <span class="historical-label">Historical figure</span>
+                  <h3 id="figure-title">Power &amp; false positives</h3>
+                </div>
+                <a
+                  id="figure-link"
+                  class="image-link"
+                  href="assets/power%20and%20null%20rejection.png"
+                  target="_blank"
+                  rel="noopener"
+                  >Open full size <span aria-hidden="true">↗</span></a
+                >
+              </div>
+              <div id="robustness-controls" class="robustness-controls" hidden>
+                <label
+                  >Metric<select id="metric">
+                    <option value="power">Detection power</option>
+                    <option value="nullrate">False-positive rate</option>
+                    <option value="perms">Comparisons</option>
+                    <option value="pval">P-values</option>
+                  </select></label
+                ><label
+                  >Compare by<select id="grouping">
+                    <option value="attack">Attack type</option>
+                    <option value="method">Watermark method</option>
+                  </select></label
+                >
+              </div>
+              <figure>
+                <div class="image-stage" id="image-stage">
+                  <p id="image-status" role="status" hidden>Loading figure…</p>
+                  <img
+                    id="figure-image"
+                    src="assets/power%20and%20null%20rejection.png"
+                    alt="Original research figure comparing detection power and null rejection rate across permutation budgets."
+                    loading="lazy"
+                  />
+                </div>
+                <figcaption id="figure-caption">
+                  Report setup: OPT-1.3B, 200 texts, 80 generated tokens, α =
+                  0.05 and c = 0.04. Original project figure; not a new
+                  reproduction.
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+          <p class="evidence-note">
+            <span aria-hidden="true">ⓘ</span> These are preserved research
+            figures. Raw per-trial runs are not included in the repository;
+            resample counts alone do not establish a wall-clock speedup.
+            <a
+              href="https://github.com/juyal-devashish/LLM-Sequential-Watermarking/blob/main/docs/VALIDATION.md"
+              >Validation status</a
+            >
+          </p>
+        </div>
+      </section>
+      <section class="wrap section about" id="about">
+        <div>
+          <span class="section-kicker">Behind the project</span>
+          <h2>Research is a<br />team effort.</h2>
+          <p>University of Michigan<br />CSE 598, Winter 2025</p>
+        </div>
+        <div>
+          <p class="contributors">
+            Devashish Juyal, Emilio Cantu-Cervini, Zicheng Jin, and Sri Likhita
+            Adru.
+          </p>
+          <p>
+            Devashish contributed the literature survey, sequential testing
+            framework, detection implementation, proposed power and
+            null-rejection experiments, and analysis of statistical validity.
+            The research and experimental work were collaborative.
+          </p>
+          <div class="resources">
+            <a href="assets/Final%20Report.pdf"
+              >Final report <span>PDF ↗</span></a
+            ><a
+              href="https://drive.google.com/file/d/1KNR2OcLC9Ueuu13OQ-wDDC5eKqOUWkYq/view"
+              >Project write-up <span>Drive ↗</span></a
+            ><a href="https://arxiv.org/abs/2307.15593"
+              >Watermarking paper <span>arXiv ↗</span></a
+            ><a href="https://arxiv.org/abs/2401.07365"
+              >Testing by betting <span>arXiv ↗</span></a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="wrap">
+      <span>Sequential Watermarking <small>Research exhibit</small></span
+      ><a href="#top">Back to top ↑</a>
+    </footer>
+  </body>
 </html>
