@@ -1,7 +1,8 @@
-# Project exhibit (planned)
+# Project exhibit
 
-Implementation brief: `../docs/EXHIBIT_PLAN.md`.
+The live exhibit is deployed via GitHub Pages from `main`:
+https://juyal-devashish.github.io/LLM-Sequential-Watermarking/
 
-The intended experience follows the restrained visual language of the IRM Stock Prediction exhibit: readable editorial layout, a clear research question, interactive lab, inspectable results, original figures, and reproduction instructions.
+Run `node frontend/build.mjs` to build the static site into `dist/`, then serve that directory with a static HTTP server. The build copies original figures and the final report from the repository. GitHub Actions runs the build and publishes it on each push to `main`.
 
-Proposed implementation: React + TypeScript + Vite, static JSON/CSV evidence, SVG charts, and a Web Worker for teaching simulations if needed. LLM generation stays in offline Python experiments. This directory currently contains planning documentation only; no website has been implemented or deployed.
+The interactive lab uses a seeded teaching simulation, not the research detector. The original figures are labeled historical. See `../docs/EVIDENCE.md` and `../docs/VALIDATION.md` for provenance and outstanding scientific validation.

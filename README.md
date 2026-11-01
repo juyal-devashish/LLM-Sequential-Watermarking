@@ -4,7 +4,7 @@ Research on replacing a fixed-budget watermark permutation test with a sequentia
 
 This is a University of Michigan CSE 598 Winter 2025 group project, forked from [the original group repository](https://github.com/emiliocantuc/watermark-sequential). The underlying watermark implementations build on [Kuditipudi et al.](https://github.com/jthickstun/watermark). Project-level work is collaborative; individual contributions are recorded in the final report.
 
-The repository is being prepared for an interactive project exhibit. The layout is organized for development; the research implementation still has known validation gaps. See the [exhibit plan](docs/EXHIBIT_PLAN.md) and [validation backlog](docs/VALIDATION.md).
+Explore the [live project exhibit](https://juyal-devashish.github.io/LLM-Sequential-Watermarking/). The research implementation still has known validation gaps. See the [exhibit plan](docs/EXHIBIT_PLAN.md) and [validation backlog](docs/VALIDATION.md).
 
 ## Repository map
 
@@ -18,7 +18,7 @@ The repository is being prepared for an interactive project exhibit. The layout 
 | `reports/` | Original midterm report, final report, and slides |
 | `environments/` | Historical Linux/CUDA Conda package export |
 | `docs/` | Architecture, evidence inventory, validation work, and exhibit plan |
-| `frontend/` | Exhibit implementation brief; the website is not implemented yet |
+| `frontend/` | Static exhibit, teaching simulation, and build script |
 
 See [the migration map](docs/REPOSITORY_LAYOUT.md) for renamed paths.
 
@@ -74,3 +74,7 @@ Saved figures are historical results. The current checkout has no raw per-trial 
 - Fischer and Ramdas, [Sequential Monte-Carlo Testing by Betting](https://arxiv.org/abs/2401.07365).
 
 Upstream attribution and notices embedded in the source are retained. This reorganization does not assign a new license to inherited code.
+
+## Exhibit development
+
+Run `node frontend/build.mjs` to assemble the site in `frontend/dist/`. Serve that directory with a local static server. GitHub Actions builds and deploys the site to GitHub Pages on pushes to `main`. The lab is a labeled teaching simulation; historical figures have not been reproduced from raw trial data.
