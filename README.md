@@ -54,7 +54,7 @@ python -m experiments.c4_experiment \
   --T 2 --batch_size 1 --m 20 --n_runs 100
 ```
 
-Experiments download models/datasets and may take substantial time on CPU. The instruction runner retains a historical local model default and needs an explicit accessible `--model`. Full research sweeps are in `experiments/scripts/`; they have portable paths, but their scientific behavior is pending the checks in [VALIDATION.md](docs/VALIDATION.md). In particular, the power sweep's fixed/fast branches currently hit a result-shape bug.
+Experiments download models/datasets and may take substantial time on CPU. The instruction runner retains a historical local model default and needs an explicit accessible `--model`. Full research sweeps are in `experiments/scripts/`; they have portable paths, but their scientific behavior is pending the checks in [VALIDATION.md](docs/VALIDATION.md). The fixed and fast output shapes are adapted by the runner, but full experiment execution and statistical validation remain pending.
 
 The notebooks resolve the repository root automatically when opened from the repository or `notebooks/`. They require raw `results/exp-del`, `results/exp-sub`, and `results/exp-ins` data, which are not included. Their old outputs are preserved and have not been recomputed.
 

@@ -15,6 +15,7 @@ import copy
 
 import numpy as np
 
+from experiments.result_adapter import result_for_experiment
 from watermarking.generation import generate, generate_rnd
 from watermarking.detection import phi,fast_permutation_test,permutation_test,seq_mc_permutation_test
 from watermarking.attacks import substitution_attack,insertion_attack,deletion_attack
@@ -350,7 +351,7 @@ for itm in range(T):
         null_sample = torch.nn.functional.pad(null_sample,(new_tokens-len(null_sample),0),"constant",0)
     else:
         null_sample = null_sample[1:new_tokens+1]
-    pval, _, _, tim = test(null_sample, seeds[itm])
+    pval, tim = result_for_experiment(args.test, test(null_sample, seeds[itm]), args.n_runs)
 
     pvals_null.append(pval)
     permumation_time_null.append(tim)
@@ -369,7 +370,7 @@ for itm in range(T):
     else:
         watermarked_sample = watermarked_sample[1:new_tokens+1]
     # pval = test(watermarked_sample, seeds[itm])
-    pval, _, _, tim = test(watermarked_sample, seeds[itm])
+    pval, tim = result_for_experiment(args.test, test(watermarked_sample, seeds[itm]), args.n_runs)
 
     pvals_watermark.append(pval)
     permumation_time_watermark.append(tim)
