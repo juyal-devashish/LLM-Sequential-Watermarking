@@ -1,0 +1,11 @@
+import { cp, mkdir, rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+const here = dirname(fileURLToPath(import.meta.url));
+const out = resolve(here, 'dist');
+await rm(out, { recursive: true, force: true });
+await mkdir(resolve(out, 'assets'), { recursive: true });
+for (const name of ['index.html', 'style.css', 'app.js']) await cp(resolve(here, name), resolve(out, name));
+await cp(resolve(here, '../results/figures'), resolve(out, 'assets'), { recursive: true });
+await cp(resolve(here, '../reports/Final Report.pdf'), resolve(out, 'assets/Final Report.pdf'));
+console.log('Built static exhibit in frontend/dist');
