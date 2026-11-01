@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#edf1f5" />
+    <meta name="theme-color" content="#ffffff" />
     <title>Sequential Watermarking | Research Exhibit</title>
     <meta
       name="description"
-      content="How much evidence is enough? Explore sequential testing for language model watermarks through an interactive illustration and original research figures."
+      content="Explore sequential testing for language model watermarks through an interactive illustration and original research figures."
     />
     <link rel="stylesheet" href="style.css" />
     <script defer src="app.js"></script>
@@ -18,7 +18,9 @@
       <nav class="wrap navigation" aria-label="Main navigation">
         <a class="brand" href="#top"
           ><svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M3 24h5V15h5v5h5V9h5v4h6" /></svg
+            <circle cx="10" cy="10" r="4" />
+            <circle cx="22" cy="22" r="4" />
+            <path d="M13 13l6 6M22 4v8M18 8h8M4 24h8" /></svg
           ><span
             >Sequential Watermarking<small
               >A language model research project</small
@@ -26,7 +28,7 @@
           ></a
         >
         <div class="navlinks">
-          <a href="#lab">Explore</a><a href="#method">Method</a
+          <a href="#lab">Demo</a><a href="#method">Method</a
           ><a href="#results">Results</a
           ><a
             class="source-link"
@@ -38,35 +40,66 @@
     </header>
     <main id="main">
       <section class="wrap opening" id="top">
-        <div class="project-context">
-          <span>University of Michigan</span><span>CSE 598 / Winter 2025</span>
+        <div class="paper-header">
+          <p class="project-context">CSE 598 Research Project · Winter 2025</p>
+          <h1>
+            Sequential Testing for<br class="title-break" />
+            Language Model Watermarks
+          </h1>
+          <p class="paper-subtitle">
+            Adaptive watermark detection through testing by betting
+          </p>
+          <p class="paper-authors">
+            Devashish Juyal<span>Emilio Cantu-Cervini</span
+            ><span>Zicheng Jin</span><span>Sri Likhita Adru</span>
+          </p>
+          <p class="affiliation">University of Michigan</p>
+          <div class="paper-actions">
+            <a
+              class="paper-action primary-action"
+              href="assets/Final%20Report.pdf"
+              >Research report <span aria-hidden="true">↗</span></a
+            ><a
+              class="paper-action"
+              href="https://github.com/juyal-devashish/LLM-Sequential-Watermarking"
+              >Code <span aria-hidden="true">↗</span></a
+            ><a class="paper-action" href="#lab"
+              >Interactive demo <span aria-hidden="true">↓</span></a
+            >
+          </div>
         </div>
+        <section class="abstract" aria-labelledby="abstract-title">
+          <h2 id="abstract-title">Abstract</h2>
+          <p>
+            Language model watermarks embed a statistical signal in generated
+            text. Detecting that signal typically requires repeated comparisons
+            against randomized alternatives. This project studies a sequential
+            Monte Carlo approach that evaluates evidence as it accumulates,
+            allowing detection to stop early for rejection or futility. We
+            examine detection power, false-positive rates, and resampling cost,
+            including under text edits.
+          </p>
+        </section>
         <div class="hero">
           <div class="hero-copy">
-            <h1>How much evidence is enough?</h1>
-            <p class="lead">
-              Finding a watermark in AI-generated text, one comparison at a
-              time.
+            <span class="section-kicker">An interactive explanation</span>
+            <h2>When can a detector stop?</h2>
+            <p class="summary">
+              A fixed-budget test uses a predetermined number of comparisons. A
+              sequential test checks the evidence after each one.
             </p>
             <p class="summary">
-              A fixed-budget test keeps comparing until its budget runs out. A
-              sequential test checks along the way—and can stop when it has
-              enough evidence.
+              Choose a scenario, advance the comparisons, or inspect a point
+              along the trace to see the idea in action.
             </p>
-            <a class="report-link" href="assets/Final%20Report.pdf"
-              >Read the research report <span aria-hidden="true">↗</span></a
-            >
-            <div class="hero-note">
-              <span class="note-mark" aria-hidden="true">↳</span>
-              <p>
-                Try the monitor. Change the signal and watch when the
-                illustration reaches its stopping point.
-              </p>
-            </div>
+            <p class="demo-disclaimer">
+              This teaching simulation uses synthetic scores. It is not the
+              research detector or a measure of detection accuracy.
+            </p>
           </div>
           <div class="monitor" id="lab" aria-labelledby="monitor-title">
             <div class="monitor-heading">
-              <h2 id="monitor-title">Evidence monitor</h2>
+              <h2 id="monitor-title">Sequential testing, illustrated</h2>
               <span class="simulation-label">Teaching simulation</span>
             </div>
             <div
@@ -201,7 +234,7 @@
       </section>
       <section class="wrap method section" id="method">
         <div class="section-heading">
-          <h2>A hidden signal.<br />A measurable decision.</h2>
+          <h2>Method overview</h2>
           <p>
             A secret key guides word sampling. Detection asks whether the text
             aligns with that key more closely than it would with random
@@ -261,7 +294,7 @@
           <div class="section-heading">
             <div>
               <span class="section-kicker">The original research</span>
-              <h2>Inspect the evidence.</h2>
+              <h2>Experimental results</h2>
             </div>
             <p>
               Detection quality is only half the story. Explore false positives,
@@ -360,7 +393,7 @@
       <section class="wrap section about" id="about">
         <div>
           <span class="section-kicker">Behind the project</span>
-          <h2>Research is a<br />team effort.</h2>
+          <h2>Contributors &amp; resources</h2>
           <p>University of Michigan<br />CSE 598, Winter 2025</p>
         </div>
         <div>

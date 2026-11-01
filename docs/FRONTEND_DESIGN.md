@@ -1,29 +1,21 @@
-# Exhibit redesign
+# AI research exhibit design
 
-Design reference: [Anthropic frontend-design](https://github.com/anthropics/skills/tree/main/skills/frontend-design). User brief: engaging finance-inspired project demo, restrained rather than product marketing.
+Design guidance: [Anthropic frontend-design](https://github.com/anthropics/skills/tree/main/skills/frontend-design). The user's clarified direction is a **clean AI research website**, superseding the earlier finance theme.
 
 ## Direction
 
-A quantitative research workspace: lead with the question and an operable evidence monitor. Keep the historical charts and their provenance easy to inspect. Avoid commercial language, decorative market prices, or implying that watermarking is a finance model.
+Lead with the research itself: descriptive project title, full team, university, report/code/demo links, and a concise abstract. Put the interactive explanation after the abstract, followed by method, historical experimental results, and contributors/resources.
 
-- Colors: canvas `#edf1f5`, paper `#ffffff`, ink `#172d43`, secondary `#52647a`, signal `#09796b`, threshold `#b35c16`. Monitor uses ink with light cyan and amber for readable chart contrast.
-- Typography: Avenir Next with humanist system fallbacks, for headings and body; tabular figures for chart readouts. No serif newspaper styling or decorative uppercase metadata.
-- Layout: left-aligned question and compact project explanation beside a larger interactive chart. A shared experiment-settings strip anchors the opening. Below: a short actual three-step method, a large results viewer with contextual metric controls, and contributors/resources.
-- Interaction: scenario buttons, run/pause, step, replay, scrubber, explicit final state, chart metric/view controls, original-image links. Motion occurs only after an action. Reduced motion disables animated playback and offers immediate completion.
+- Palette: white `#ffffff`, charcoal `#20242d`, secondary text `#606673`, subtle rules `#e1e4eb`, restrained blue `#385bd6`.
+- Type: Avenir Next with humanist system fallbacks; a clear research title, modest section headings, readable paragraphs, and tabular chart values.
+- Layout: centered paper-style project header and author line; narrow abstract; left-aligned explanations and figures below. Whitespace separates the research narrative.
+- Components: light interactive illustration, quiet figure controls, original full-size figure links, and explicit source attribution.
+- Motion: user-triggered playback only, with manual stepping and reduced-motion handling.
 
-```text
-name                       Explore / Method / Results / Source
-question + explanation     interactive evidence monitor
-                           scenario / chart / scrub / controls
-report model     dataset     text length     significance
-method: generate -> compare -> decide
-results navigation         large original figure
-reading guide              caption + provenance
-contributors               report / references
-```
+## Review
 
-## Review before implementation
+Remove the financial dashboard treatment: no dark monitor, market-style logo, promotional question as the page title, or finance terminology. Preserve the useful interactions and scientific provenance. The demo is explicitly synthetic, the original images remain historical, and the course project is not presented as a peer-reviewed publication.
 
-The prior cream/serif/copper treatment reads as a generic report, and repeated numbered headings add little navigation value. Replace it with a single visually prominent chart, broad cool surfaces, and fewer containers. Keep the finance influence in chart conventions and comparative research, not fake trading chrome. Avoid re-creating a dense terminal; the page must explain the project to a first-time visitor.
+## Validation
 
-Historical PNGs remain original. The demonstration remains explicitly synthetic and is not a p-value, detector, or measured result. No performance claim is inferred from the redesigned graphics.
+Reviewed the project header and light demo in a real browser, including 390px and 320px widths with no horizontal page overflow. Verified step advancement and robustness metric selection after the restyle. Research simulation behavior and empirical limitations remain unchanged; see `frontend/README.md` and `docs/VALIDATION.md`.
